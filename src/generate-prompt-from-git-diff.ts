@@ -1,20 +1,20 @@
 import { exec as cpExec } from "child_process";
 import { readFile, writeFile, stat } from "fs/promises";
 import { join } from "path";
-// ⛳ Removed: import { fileURLToPath } from "url";
 import { promisify } from "util";
 
 const exec = promisify(cpExec);
 
-const MAX_CONSOLE_LINES_DEFAULT = 10;
-const MAX_NEWFILE_SIZE_BYTES = 1_000_000; // 1MB
+export const MAX_CONSOLE_LINES_DEFAULT = 10;
+export const MAX_NEWFILE_SIZE_BYTES = 1_000_000; // 1MB
 
 const __DIRNAME_SAFE =
+  /* c8 ignore next */
   typeof __dirname !== "undefined" ? __dirname : process.cwd();
 
-type ExecResult = { stdout: string; stderr: string };
+export type ExecResult = { stdout: string; stderr: string };
 
-interface Options {
+export interface Options {
   maxConsoleLines: number;
   outputPath: string;
   includeUntracked: boolean;
@@ -22,7 +22,7 @@ interface Options {
   maxBuffer: number;
 }
 
-const defaultOptions: Options = {
+export const defaultOptions: Options = {
   maxConsoleLines:
     Number(process.env.MAX_CONSOLE_LINES) || MAX_CONSOLE_LINES_DEFAULT,
   outputPath: join(__DIRNAME_SAFE, "generated-prompt.txt"),
@@ -31,7 +31,7 @@ const defaultOptions: Options = {
   maxBuffer: 50 * 1024 * 1024,
 };
 
-function parseArgs(argv: string[]): Partial<Options> {
+export function parseArgs(argv: string[]): Partial<Options> {
   const out: Partial<Options> = {};
   for (const a of argv.slice(2)) {
     if (a.startsWith("--lines=")) out.maxConsoleLines = Number(a.split("=")[1]);
@@ -46,7 +46,7 @@ function parseArgs(argv: string[]): Partial<Options> {
   return out;
 }
 
-async function runGit(cmd: string, opt: Options): Promise<string> {
+export async function runGit(cmd: string, opt: Options): Promise<string> {
   const { stdout } = (await exec(cmd, {
     maxBuffer: opt.maxBuffer,
   })) as ExecResult;
@@ -54,11 +54,11 @@ async function runGit(cmd: string, opt: Options): Promise<string> {
   return stdout;
 }
 
-function looksBinary(buf: Buffer): boolean {
+export function looksBinary(buf: Buffer): boolean {
   return buf.includes(0);
 }
 
-function generatePrompt(patchContent: string): string {
+export function generatePrompt(patchContent: string): string {
   return `
 I made changes to the following code. Here is the diff of the modifications:
 
@@ -101,7 +101,7 @@ Branch: <type>[/<scope>]/<short-kebab-slug>
   `.trim();
 }
 
-async function collectDiff(opt: Options): Promise<string> {
+export async function collectDiff(opt: Options): Promise<string> {
   const diff = await runGit("git diff && git diff --cached", opt);
   let full = diff.trim();
 
@@ -145,7 +145,7 @@ async function collectDiff(opt: Options): Promise<string> {
   return full;
 }
 
-function printPreview(prompt: string, maxLines: number) {
+export function printPreview(prompt: string, maxLines: number) {
   console.log("\n--- Prompt for ChatGPT (preview) ---\n");
   const lines = prompt.split("\n");
   for (const line of lines.slice(0, Math.max(0, maxLines))) {

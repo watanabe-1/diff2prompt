@@ -19,7 +19,8 @@
     "test:watch": "vitest --watch",
     "lint": "eslint \"**/*.ts\"",
     "lint:fix": "eslint \"**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "diff2prompt": "bun run src/index.ts"
   },
   "dependencies": {},
   "devDependencies": {

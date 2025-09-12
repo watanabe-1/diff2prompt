@@ -1,0 +1,290 @@
+import * as util from "node:util";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { ChildProcess } from "child_process";
+
+// === shared state for mocks (hoisted) ===
+const gitMap = vi.hoisted(() => ({
+  data: new Map<string, string>(),
+  reset() {
+    this.data.clear();
+  },
+}));
+
+const fsState = vi.hoisted(() => ({
+  files: new Map<string, { size: number; buf?: Buffer; err?: Error }>(),
+  writes: [] as Array<{ path: string; data: string; enc?: string }>,
+  reset() {
+    this.files.clear();
+    this.writes.length = 0;
+  },
+}));
+
+// ---- child_process mock ----
+vi.mock("child_process", () => {
+  type ExecCb = (error: Error | null, stdout?: string, stderr?: string) => void;
+
+  function coreExecBehavior(cmd: string): {
+    cbError: Error | null;
+    promiseReject: Error | string | null;
+    stdout: string;
+    stderr: string;
+  } {
+    const out = gitMap.data.get(cmd) ?? "";
+
+    // 1) 通常成功
+    if (!out.startsWith("__ERR__:") && !out.startsWith("__REJECTSTR__:")) {
+      return { cbError: null, promiseReject: null, stdout: out, stderr: "" };
+    }
+
+    // 2) Error で失敗
+    if (out.startsWith("__ERR__:")) {
+      const msg = out.slice("__ERR__:".length);
+
+      return {
+        cbError: new Error(msg),
+        promiseReject: new Error(msg),
+        stdout: "",
+        stderr: "",
+      };
+    }
+
+    // 3) 文字列で失敗
+    const msg = out.slice("__REJECTSTR__:".length);
+
+    return {
+      cbError: new Error(msg), // callback 版は Error を渡す（互換性）
+      promiseReject: msg, // promisify.custom は string reject
+      stdout: "",
+      stderr: "",
+    };
+  }
+
+  // callback 版 exec
+  function exec(
+    cmd: string,
+    optionsOrCb?: { maxBuffer?: number } | ExecCb,
+    maybeCb?: ExecCb
+  ): ChildProcess {
+    const cb: ExecCb | undefined =
+      typeof optionsOrCb === "function" ? optionsOrCb : maybeCb;
+
+    const { cbError, stdout, stderr } = coreExecBehavior(cmd);
+    cb?.(cbError, stdout, stderr);
+
+    return {} as ChildProcess;
+  }
+
+  // promisify.custom 版 exec
+  const custom = (cmd: string, _opts?: { maxBuffer?: number }) =>
+    new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      const { promiseReject, stdout, stderr } = coreExecBehavior(cmd);
+      if (promiseReject !== null) reject(promiseReject);
+      else resolve({ stdout, stderr });
+    });
+
+  exec[util.promisify.custom] = custom;
+
+  return { exec };
+});
+
+// ---- fs/promises mock ----
+vi.mock("fs/promises", () => {
+  const writeFile = vi.fn(async (path: string, data: string, enc?: string) => {
+    fsState.writes.push({ path, data, enc });
+  });
+
+  const readFile = vi.fn(async (path: string): Promise<Buffer> => {
+    const f = fsState.files.get(path);
+    if (!f) throw new Error(`ENOENT: ${path}`);
+    if (f.err) throw f.err;
+    if (!f.buf) throw new Error("No buffer");
+
+    return f.buf;
+  });
+
+  const stat = vi.fn(async (path: string): Promise<{ size: number }> => {
+    const f = fsState.files.get(path);
+    if (!f) throw new Error(`ENOENT: ${path}`);
+    if (f.err) throw f.err;
+
+    return { size: f.size };
+  });
+
+  return { writeFile, readFile, stat };
+});
+
+// SUT import AFTER mocks
+const importSut = async () => await import("./generate-prompt-from-git-diff");
+
+// ---- helpers ----
+function mockExit() {
+  const original = process.exit;
+  process.exit = ((code?: number) => {
+    throw new Error(`process.exit(${code})`);
+  }) as (code?: number) => never;
+
+  return {
+    restore: () => {
+      process.exit = original;
+    },
+  };
+}
+
+describe("generate.ts flow", () => {
+  const origArgv = process.argv.slice();
+  const origEnv = { ...process.env };
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  let exitCtl: { restore: () => void };
+
+  beforeEach(() => {
+    gitMap.reset();
+    fsState.reset();
+    process.argv = ["node", "script"];
+    process.env = { ...origEnv };
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    exitCtl = mockExit();
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+    logSpy.mockRestore();
+    errSpy.mockRestore();
+    exitCtl.restore();
+    process.argv = origArgv.slice();
+    process.env = { ...origEnv };
+  });
+
+  it("main(): diff + untracked (text/binary/huge/error), truncated preview, writes file", async () => {
+    const diff = "diff --git a/x b/x\n@@\n-1\n+2\n";
+    gitMap.data.set("git rev-parse --show-toplevel", "/repo\n");
+    gitMap.data.set("git diff && git diff --cached", diff);
+    gitMap.data.set(
+      "git ls-files --others --exclude-standard",
+      ["a.txt", "b.bin", "huge.txt", "err.txt"].join("\n")
+    );
+
+    fsState.files.set("a.txt", { size: 5, buf: Buffer.from("hello") });
+    fsState.files.set("b.bin", { size: 5, buf: Buffer.from([0x00, 0x10]) }); // binary
+    fsState.files.set("huge.txt", { size: 1_000_001, buf: Buffer.from("x") });
+    fsState.files.set("err.txt", {
+      size: 10,
+      err: new Error("Permission denied"),
+    });
+
+    process.argv.push("--lines=3", "--out=OUT.txt");
+    const { main } = await importSut();
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.path.endsWith("OUT.txt")).toBe(true);
+    expect(out.data).toContain(diff);
+    expect(out.data).toContain("--- New files (contents) ---");
+    expect(out.data).toMatch(/File: a\.txt[\s\S]*hello/);
+    expect(out.data).toMatch(/File: b\.bin[\s\S]*binary content skipped/);
+    expect(out.data).toMatch(/File: huge\.txt[\s\S]*skipped: too large/);
+    expect(out.data).toMatch(
+      /File: err\.txt[\s\S]*<read error: Permission denied>/
+    );
+
+    const logs = logSpy.mock.calls.flat().join("\n");
+    expect(logs).toContain("--- Prompt for ChatGPT (preview) ---");
+    expect(logs).toContain("... (truncated) ...");
+    expect(logs).toContain("Prompt written to: OUT.txt");
+  });
+
+  it("collectDiff(): respects --no-untracked", async () => {
+    gitMap.data.set("git rev-parse --show-toplevel", "/repo\n");
+    gitMap.data.set("git diff && git diff --cached", "diff --git a/y b/y\n");
+    gitMap.data.set("git ls-files --others --exclude-standard", "a.txt\n");
+
+    const { collectDiff, defaultOptions } = await importSut();
+    const s = await collectDiff({ ...defaultOptions, includeUntracked: false });
+    expect(s).toContain("diff --git a/y b/y");
+    expect(s).not.toContain("New files (contents)");
+  });
+
+  it("collectDiff(): --max-new-size forces skip", async () => {
+    gitMap.data.set("git diff && git diff --cached", "");
+    gitMap.data.set("git ls-files --others --exclude-standard", "tiny.txt\n");
+    fsState.files.set("tiny.txt", { size: 10, buf: Buffer.from("0123456789") });
+
+    const { collectDiff, defaultOptions } = await importSut();
+    const s = await collectDiff({
+      ...defaultOptions,
+      maxNewFileSizeBytes: 5,
+      includeUntracked: true,
+    });
+    expect(s).toMatch(/File: tiny\.txt/);
+    expect(s).toMatch(/skipped: too large \(10 bytes\)/);
+  });
+
+  it("main(): prints error and exits(1) when git root check fails", async () => {
+    gitMap.data.set(
+      "git rev-parse --show-toplevel",
+      "__ERR__:fatal: not a git repo"
+    );
+    const { main } = await importSut();
+    await expect(main()).rejects.toThrow("process.exit(1)");
+    const errOut = errSpy.mock.calls.flat().join("\n");
+    expect(errOut).toMatch(/^Error: /);
+  });
+
+  it("main(): exits(1) when no diff and no new files", async () => {
+    gitMap.data.set("git rev-parse --show-toplevel", "/repo\n");
+    gitMap.data.set("git diff && git diff --cached", "");
+    gitMap.data.set("git ls-files --others --exclude-standard", "");
+    const { main } = await importSut();
+    await expect(main()).rejects.toThrow("process.exit(1)");
+    const errOut = errSpy.mock.calls.flat().join("\n");
+    expect(errOut).toContain("No changes found: neither diffs nor new files.");
+  });
+
+  it("printPreview(): does not print truncation when lines <= maxLines", async () => {
+    const { printPreview } = await importSut();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const prompt = ["line1", "line2"].join("\n");
+      printPreview(prompt, /* maxLines*/ 5); // 2 <= 5 → 非トランケーション
+      const logs = logSpy.mock.calls.flat().join("\n");
+      expect(logs).toContain("--- Prompt for ChatGPT (preview) ---");
+      expect(logs).toContain("line1");
+      expect(logs).toContain("line2");
+      expect(logs).not.toContain("... (truncated) ...");
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("collectDiff(): captures non-Error thrown by readFile/stat (String(e) branch)", async () => {
+    // diff は空だが、未追跡ファイル存在 → 'full' は空でなくなる
+    gitMap.data.set("git diff && git diff --cached", "");
+    gitMap.data.set("git ls-files --others --exclude-standard", "weird.txt\n");
+
+    // fs モック側は f.err をそのまま throw するので、文字列を入れて非 Error を投げさせる
+    fsState.files.set("weird.txt", {
+      size: 123,
+      err: "BOOM_STRING_ERROR" as unknown as Error,
+    });
+
+    const { collectDiff, defaultOptions } = await importSut();
+    const s = await collectDiff({ ...defaultOptions, includeUntracked: true });
+    // String(e) が使われ <read error: BOOM_STRING_ERROR> になる
+    expect(s).toContain("File: weird.txt");
+    expect(s).toContain("<read error: BOOM_STRING_ERROR>");
+  });
+
+  it("main(): handles non-Error rejection from runGit (String(err) branch)", async () => {
+    // git rev-parse が「文字列で」reject
+    gitMap.data.set(
+      "git rev-parse --show-toplevel",
+      "__REJECTSTR__:STRINGY_FAIL"
+    );
+    const { main } = await importSut();
+    await expect(main()).rejects.toThrow("process.exit(1)");
+    const errOut = errSpy.mock.calls.flat().join("\n");
+    // catch 側で String(err) → "STRINGY_FAIL" が出る
+    expect(errOut).toContain("Error: STRINGY_FAIL");
+  });
+});
