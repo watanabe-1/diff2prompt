@@ -1,14 +1,15 @@
-import { readFile, writeFile, stat } from "fs/promises";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
-import { promisify } from "util";
 import { exec as cpExec } from "child_process";
+import { readFile, writeFile, stat } from "fs/promises";
+import { join } from "path";
+import { promisify } from "util";
 
 const exec = promisify(cpExec);
 
 const MAX_CONSOLE_LINES_DEFAULT = 10;
-const MAX_NEWFILE_SIZE_BYTES = 1_000_000; // 1MB: skip huge new files to avoid giant prompts
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const MAX_NEWFILE_SIZE_BYTES = 1_000_000; // 1MB
+
+const __DIRNAME_SAFE =
+  typeof __dirname !== "undefined" ? __dirname : process.cwd();
 
 type ExecResult = { stdout: string; stderr: string };
 
@@ -23,15 +24,13 @@ interface Options {
 const defaultOptions: Options = {
   maxConsoleLines:
     Number(process.env.MAX_CONSOLE_LINES) || MAX_CONSOLE_LINES_DEFAULT,
-  outputPath: join(__dirname, "generated-prompt.txt"),
+  outputPath: join(__DIRNAME_SAFE, "generated-prompt.txt"),
   includeUntracked: true,
   maxNewFileSizeBytes: MAX_NEWFILE_SIZE_BYTES,
-  maxBuffer: 50 * 1024 * 1024, // 50MB to tolerate large diffs
+  maxBuffer: 50 * 1024 * 1024,
 };
 
 function parseArgs(argv: string[]): Partial<Options> {
-  // Very light arg parsing (no deps):
-  // --lines=20 --no-untracked --out=./prompt.txt --max-new-size=2000000 --max-buffer=104857600
   const out: Partial<Options> = {};
   for (const a of argv.slice(2)) {
     if (a.startsWith("--lines=")) out.maxConsoleLines = Number(a.split("=")[1]);
@@ -42,6 +41,7 @@ function parseArgs(argv: string[]): Partial<Options> {
     else if (a.startsWith("--max-buffer="))
       out.maxBuffer = Number(a.split("=")[1]);
   }
+
   return out;
 }
 
@@ -49,11 +49,11 @@ async function runGit(cmd: string, opt: Options): Promise<string> {
   const { stdout } = (await exec(cmd, {
     maxBuffer: opt.maxBuffer,
   })) as ExecResult;
+
   return stdout;
 }
 
 function looksBinary(buf: Buffer): boolean {
-  // Simple heuristic: NUL byte present -> treat as binary
   return buf.includes(0);
 }
 
@@ -78,26 +78,21 @@ Please generate **all** of the following based on the diff:
    Format: <type>(<optional-scope>): <message>
    - Keep message concise (≤ 72 chars if possible), sentence case.
    - Prefer scopes when clear from the diff. Examples:
-     - deps / deps-dev (package.json, lockfiles; dev-only -> deps-dev)
-     - ci (.github/workflows, CI config)
-     - docs (README, docs/)
-     - test (test files)
-     - build (bundler/tsconfig)
-     - perf, security, etc. when appropriate.
+     - deps / deps-dev
+     - ci
+     - docs
+     - test
+     - build
+     - perf, security, etc.
 
-2) **PR title**:
-   - **Mirror the commit message exactly** (same type/scope/message, same casing).
-   - No extra punctuation at the end.
+2) **PR title**: mirror the commit message exactly.
 
 3) **Branch name**:
    - Lowercase kebab-case, ASCII [a–z0–9-] only.
-   - Prefix with "<type>/" and include "/<scope>" if a scope is used.
-     Examples: "chore/deps/...", "fix/ci/...", "feat/...".
-   - Derive from the commit message; drop stop words; keep ≤ 40 chars after the prefix.
-   - Example derivation: "chore(deps): bump bun group versions"
-     -> branch: "chore/deps/bump-bun-group-versions"
+   - Prefix "<type>/" and include "/<scope>" if used.
+   - ≤ 40 chars after the prefix.
 
-**Output exactly in the format below (no extra text):**
+**Output format:**
 
 Commit message: <type>(<optional-scope>): <message>
 PR title: <type>(<optional-scope>): <message>
@@ -106,12 +101,9 @@ Branch: <type>[/<scope>]/<short-kebab-slug>
 }
 
 async function collectDiff(opt: Options): Promise<string> {
-  // 1) staged + unstaged diffs
   const diff = await runGit("git diff && git diff --cached", opt);
-
   let full = diff.trim();
 
-  // 2) untracked files (optional)
   if (opt.includeUntracked) {
     const filesStdout = await runGit(
       "git ls-files --others --exclude-standard",
@@ -137,13 +129,13 @@ async function collectDiff(opt: Options): Promise<string> {
           } else {
             full += `\nFile: ${file}\n${buf.toString("utf8")}\n`;
           }
-        } catch (e: any) {
-          full += `\nFile: ${file}\n<read error: ${e?.message ?? e}>\n`;
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          full += `\nFile: ${file}\n<read error: ${msg}>\n`;
         }
       }
     }
 
-    // If nothing changed at all, surface a friendly error
     if (!full.trim()) {
       throw new Error("No changes found: neither diffs nor new files.");
     }
@@ -158,27 +150,22 @@ function printPreview(prompt: string, maxLines: number) {
   for (const line of lines.slice(0, Math.max(0, maxLines))) {
     console.log(line);
   }
-  if (lines.length > maxLines) {
-    console.log("... (truncated) ...");
-  }
+  if (lines.length > maxLines) console.log("... (truncated) ...");
 }
 
 export async function main() {
   const opt: Options = { ...defaultOptions, ...parseArgs(process.argv) };
 
   try {
-    // Ensure we are inside a git repo (will throw if not)
     await runGit("git rev-parse --show-toplevel", opt);
-
     const patchContent = await collectDiff(opt);
     const prompt = generatePrompt(patchContent);
-
     printPreview(prompt, opt.maxConsoleLines);
-
     await writeFile(opt.outputPath, prompt, "utf8");
     console.log(`\nPrompt written to: ${opt.outputPath}`);
-  } catch (err: any) {
-    console.error(`Error: ${err?.message ?? err}`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`Error: ${msg}`);
     process.exit(1);
   }
 }
