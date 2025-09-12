@@ -1,8 +1,22 @@
 {
   "name": "diff2prompt",
+  "version": "0.0.1",
+  "author": "watanabe-1",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/watanabe-1/diff2prompt"
+  },
+  "homepage": "https://github.com/watanabe-1/diff2prompt#readme",
+  "bugs": {
+    "url": "https://github.com/watanabe-1/diff2prompt/issues"
+  },
+  "keywords": [
+    "typescript",
+    "cli"
+  ],
   "module": "dist/index.js",
   "type": "module",
-  "private": true,
   "files": [
     "dist"
   ],
@@ -10,8 +24,7 @@
     "diff2prompt": "dist/index.js"
   },
   "scripts": {
-    "build": "bun run clean && bun build.ts && bun run build:types",
-    "build:types": "tsc -p tsconfig.build-types.json",
+    "build": "bun run clean && bun build.ts",
     "clean": "bun -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage.enabled true",
