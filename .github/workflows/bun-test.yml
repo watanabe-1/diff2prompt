@@ -11,7 +11,6 @@ jobs:
     strategy:
       matrix:
         bun-version: ["1.1.0", "tool-versions"]
-        next-version: ["14.0.0", "15.0.0", "from-package"]
 
     steps:
       - uses: actions/checkout@v5
@@ -36,20 +35,9 @@ jobs:
             bun install
           fi
 
-      - name: Set Next.js version
-        run: |
-          if [ "${{ matrix.next-version }}" = "from-package" ]; then
-            echo "Using next from package.json"
-          else
-            echo "Overwriting package.json to use next@${{ matrix.next-version }}"
-            rm -f bun.lockb bun.lock
-            bun add "next@${{ matrix.next-version }}"
-          fi
-
       - name: Print versions
         run: |
           bun -v
-          bunx next --version
 
       - name: Typecheck
         run: bun run typecheck

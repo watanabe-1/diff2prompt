@@ -46,9 +46,6 @@
     },
     "diffEditor.ignoreTrimWhitespace": false,
     "javascript.updateImportsOnFileMove.enabled": "always",
-    "files.exclude": {
-      "**/.next": true,
-    },
     "files.eol": "\n",
   },
 }
