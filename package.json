@@ -7,7 +7,7 @@
     "dist"
   ],
   "bin": {
-    "rpc4next": "dist/index.js"
+    "diff2prompt": "dist/index.js"
   },
   "scripts": {
     "build": "bun run clean && bun build.ts && bun run build:types",
