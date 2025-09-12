@@ -1,0 +1,54 @@
+{
+  "folders": [
+    {
+      "path": "../",
+    },
+  ],
+  "settings": {
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": "active",
+    "eslint.format.enable": false,
+    "eslint.enable": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "always",
+      "source.addMissingImports": "always",
+    },
+    "markuplint.enable": true,
+    "[javascript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+    },
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+    },
+    "[typescript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+    },
+    "[typescriptreact]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+    },
+    "editor.lineNumbers": "on",
+    "editor.rulers": [80],
+    "editor.wordWrap": "on",
+    "files.insertFinalNewline": true,
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "typescript.preferences.importModuleSpecifier": "non-relative",
+    "files.autoGuessEncoding": true,
+    "[html]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+    },
+    "[jsonc]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+    },
+    "[markdown]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+    },
+    "diffEditor.ignoreTrimWhitespace": false,
+    "javascript.updateImportsOnFileMove.enabled": "always",
+    "files.exclude": {
+      "**/.next": true,
+    },
+    "files.eol": "\n",
+  },
+}
