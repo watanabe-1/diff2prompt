@@ -1,0 +1,15 @@
+*.env         text eol=lf
+*.gitattributes text eol=lf
+*.gitignore   text eol=lf
+*.js          text eol=lf
+*.json        text eol=lf
+*.md          text eol=lf
+*.mjs         text eol=lf
+*.ts          text eol=lf
+*.tsx         text eol=lf
+*.txt         text eol=lf
+*.yml         text eol=lf
+*.lock        text eol=lf
+.code-workspace text eol=lf
+.gitignore    text eol=lf
+.tool-versions    text eol=lf

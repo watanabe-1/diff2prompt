@@ -1,0 +1,48 @@
+name: Tag PRs with Release Version
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Release version"
+        required: true
+        type: string
+
+jobs:
+  tag_prs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Get previous tag
+        id: previous_tag
+        run: |
+          prev_tag=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^v${{ inputs.version }}$" | head -n 1)
+          echo "tag=$prev_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Find merged PRs between tags
+        id: find_prs
+        run: |
+          prs=$(git log --pretty=format:"%s" ${{ steps.previous_tag.outputs.tag }}..v${{ inputs.version }} \
+            | grep -v 'chore: bump version' \
+            | grep -oE '#[0-9]+' \
+            | tr -d '#' \
+            | xargs || true)
+          echo "prs=${prs}" >> $GITHUB_OUTPUT
+
+      - name: Tag PR titles with release version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for pr in ${{ steps.find_prs.outputs.prs }}; do
+            title=$(gh pr view $pr --json title -q ".title")
+            if [[ "$title" != *"[v${{ inputs.version }}]"* ]]; then
+              gh pr edit $pr --title "$title [v${{ inputs.version }}]"
+            else
+              echo "PR #$pr already includes version"
+            fi
+          done

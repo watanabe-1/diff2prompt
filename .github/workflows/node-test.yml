@@ -1,0 +1,78 @@
+name: Node test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  node-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        node-version: [18, 20, 22, tool-versions]
+        next-version: ["14.0.0", "15.0.0", "from-package"]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js (from matrix)
+        if: matrix.node-version != 'tool-versions'
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Setup Node.js (from .tool-versions)
+        if: matrix.node-version == 'tool-versions'
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .tool-versions
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .tool-versions
+
+      - name: Install base dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install target Next.js version
+        run: |
+          if [ "${{ matrix.next-version }}" = "from-package" ]; then
+            echo "Using next from package.json"
+          else
+            echo "Overwriting package.json to use next@${{ matrix.next-version }}"
+            rm -f bun.lockb bun.lock
+            bun add "next@${{ matrix.next-version }}"
+          fi
+
+      - name: Print versions
+        run: |
+          node -v
+          bun next --version
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Build
+        run: bun run build
+
+      - name: Test
+        run: |
+          if [ "${{ matrix.node-version }}" = "tool-versions" ] && [ "${{ matrix.next-version }}" = "from-package" ]; then
+            npm run test:coverage
+          else
+            npm run test
+          fi
+
+      - name: Upload coverage
+        if: ${{ matrix.node-version == 'tool-versions' && matrix.next-version == 'from-package' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage

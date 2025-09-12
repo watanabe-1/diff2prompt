@@ -1,0 +1,28 @@
+name: Report Coverage
+
+on:
+  workflow_run:
+    workflows: ["Node test"]
+    types:
+      - completed
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+
+    permissions:
+      actions: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+          name: coverage
+          path: coverage
+      - name: "Report Coverage"
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          comment-on: pr,commit

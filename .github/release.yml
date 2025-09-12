@@ -1,0 +1,56 @@
+changelog:
+  exclude:
+    labels:
+      - release
+    authors:
+      - github-actions[bot]
+
+  categories:
+    - title: 🚀 Features
+      labels:
+        - feature
+
+    - title: 🐛 Fixes
+      labels:
+        - fix
+        - hotfix
+
+    - title: 🛠 Refactors
+      labels:
+        - refactor
+
+    - title: 🧪 Tests
+      labels:
+        - test
+
+    - title: 📝 Documentation
+      labels:
+        - docs
+
+    - title: 📦 CLI
+      labels:
+        - cli
+
+    - title: 🧩 Client
+      labels:
+        - client
+
+    - title: 🖧 Server
+      labels:
+        - server
+
+    - title: 🖥 App
+      labels:
+        - app
+
+    - title: ⚙️ CI / Infrastructure
+      labels:
+        - ci
+
+    - title: 🔧 Chores
+      labels:
+        - chore
+
+    - title: 🗃 Others
+      labels:
+        - "*"

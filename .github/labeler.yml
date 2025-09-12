@@ -1,0 +1,49 @@
+app:
+  - changed-files:
+      - any-glob-to-any-file: "src/**"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+
+cli:
+  - changed-files:
+      - any-glob-to-any-file: "src/rpc/cli/**"
+
+client:
+  - changed-files:
+      - any-glob-to-any-file: "src/rpc/client/**"
+
+server:
+  - changed-files:
+      - any-glob-to-any-file: "src/rpc/server/**"
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file: "docs/**"
+      - any-glob-to-any-file: "**/*.md"
+  - head-branch: ["^docs/"]
+
+test:
+  - changed-files:
+      - any-glob-to-any-file: "src/tests/**"
+      - any-glob-to-any-file: "**/*.test.*"
+  - head-branch: ["^test/"]
+
+feature:
+  - head-branch: ["^feature/", "^feat/"]
+
+fix:
+  - head-branch: ["^bugfix/", "^fix/", "^bug/"]
+
+chore:
+  - head-branch: ["^chore/"]
+
+refactor:
+  - head-branch: ["^refactor/"]
+
+release:
+  - head-branch: ["^release/"]
+
+hotfix:
+  - head-branch: ["^hotfix/"]

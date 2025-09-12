@@ -1,0 +1,105 @@
+name: Create Release PR
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      not_on_main: ${{ steps.check.outputs.not_on_main }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Fetch main branch
+        run: git fetch origin main
+
+      - name: Check if tag is on main
+        id: check
+        run: |
+          tag_commit=$(git rev-list -n 1 ${{ github.ref_name }})
+          main_commit=$(git rev-parse origin/main)
+          base_commit=$(git merge-base $tag_commit $main_commit)
+          if [ "$base_commit" != "$tag_commit" ]; then
+            echo "not_on_main=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "not_on_main=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  create-pr:
+    needs: check-tag
+    if: needs.check-tag.outputs.not_on_main == 'false'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .tool-versions
+
+      - name: Extract version from tag
+        id: extract_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Get default branch
+        id: default_branch
+        run: |
+          branch=$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Git user
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+      - name: Bump version
+        run: |
+          npm version ${{ steps.extract_version.outputs.version }} --no-git-tag-version
+          git add package.json
+
+      - name: Get previous tag
+        id: previous_tag
+        run: |
+          prev_tag=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^v${{ steps.extract_version.outputs.version }}$" | head -n 1)
+          echo "tag=$prev_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          changelog=$(git log ${{ steps.previous_tag.outputs.tag }}..HEAD --pretty=format:"- %s" | grep -v 'chore: bump version')
+          {
+            echo "changelog<<EOF"
+            echo "$changelog"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          sign-commits: true
+          branch: release/v${{ steps.extract_version.outputs.version }}
+          base: ${{ steps.default_branch.outputs.branch }}
+          commit-message: "chore: bump version to v${{ steps.extract_version.outputs.version }}"
+          title: "Release v${{ steps.extract_version.outputs.version }}"
+          body: |
+            This PR prepares the release of v${{ steps.extract_version.outputs.version }}
+
+            ## Changes
+
+            ${{ steps.changelog.outputs.changelog }}
+          delete-branch: false
+          token: ${{ secrets.GITHUB_TOKEN }}

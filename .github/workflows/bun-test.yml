@@ -1,0 +1,64 @@
+name: Bun test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  bun-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        bun-version: ["1.1.0", "tool-versions"]
+        next-version: ["14.0.0", "15.0.0", "from-package"]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Bun (from matrix)
+        if: matrix.bun-version != 'tool-versions'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ matrix.bun-version }}
+
+      - name: Setup Bun (from .tool-versions)
+        if: matrix.bun-version == 'tool-versions'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .tool-versions
+
+      - name: Install base dependencies
+        run: |
+          if [ "${{ matrix.bun-version }}" = "tool-versions" ]; then
+            bun install --frozen-lockfile
+          else
+            bun install
+          fi
+
+      - name: Set Next.js version
+        run: |
+          if [ "${{ matrix.next-version }}" = "from-package" ]; then
+            echo "Using next from package.json"
+          else
+            echo "Overwriting package.json to use next@${{ matrix.next-version }}"
+            rm -f bun.lockb bun.lock
+            bun add "next@${{ matrix.next-version }}"
+          fi
+
+      - name: Print versions
+        run: |
+          bun -v
+          bunx next --version
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Build
+        run: bun run build
+
+      - name: Test
+        run: bun run test
