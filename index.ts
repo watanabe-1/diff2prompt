@@ -1,1 +1,3 @@
-console.log("Hello via Bun!");
+import { main } from "./generate-prompt-from-git-diff";
+
+await main();
