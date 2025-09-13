@@ -2,6 +2,7 @@ import { exec as cpExec } from "child_process";
 import { readFile, writeFile, stat } from "fs/promises";
 import { join } from "path";
 import { promisify } from "util";
+import { getRepoRootSafe, loadUserConfig } from "./config";
 
 const exec = promisify(cpExec);
 
@@ -25,7 +26,7 @@ export interface Options {
 export const defaultOptions: Options = {
   maxConsoleLines:
     Number(process.env.MAX_CONSOLE_LINES) || MAX_CONSOLE_LINES_DEFAULT,
-  outputPath: join(__DIRNAME_SAFE, "generated-prompt.txt"),
+  outputPath: "", // temp, set in main()
   includeUntracked: true,
   maxNewFileSizeBytes: MAX_NEWFILE_SIZE_BYTES,
   maxBuffer: 50 * 1024 * 1024,
@@ -155,15 +156,39 @@ export function printPreview(prompt: string, maxLines: number) {
 }
 
 export async function main() {
-  const opt: Options = { ...defaultOptions, ...parseArgs(process.argv) };
+  // Try to detect repo root first (do not fail hard here)
+  const repoRoot = (await getRepoRootSafe()) ?? process.cwd();
+
+  // Load config file(s)
+  const fileCfg = await loadUserConfig(repoRoot);
+
+  // CLI
+  const cli = parseArgs(process.argv);
+
+  // Merge: defaults -> fileCfg -> CLI
+  const merged: Options = {
+    ...defaultOptions,
+    ...fileCfg,
+    ...cli,
+  };
+
+  // Finalize default outputPath if still empty
+  if (!merged.outputPath) {
+    merged.outputPath = join(
+      repoRoot || __DIRNAME_SAFE,
+      "generated-prompt.txt"
+    );
+  }
 
   try {
-    await runGit("git rev-parse --show-toplevel", opt);
-    const patchContent = await collectDiff(opt);
+    // Keep the hard check so command fails outside a git repo
+    await runGit("git rev-parse --show-toplevel", merged);
+
+    const patchContent = await collectDiff(merged);
     const prompt = generatePrompt(patchContent);
-    printPreview(prompt, opt.maxConsoleLines);
-    await writeFile(opt.outputPath, prompt, "utf8");
-    console.log(`\nPrompt written to: ${opt.outputPath}`);
+    printPreview(prompt, merged.maxConsoleLines);
+    await writeFile(merged.outputPath, prompt, "utf8");
+    console.log(`\nPrompt written to: ${merged.outputPath}`);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`Error: ${msg}`);
