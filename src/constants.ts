@@ -1,3 +1,22 @@
+/** Header shown before previewing the generated prompt. */
+export const PREVIEW_HEADER = "\n--- Prompt for ChatGPT (preview) ---\n";
+
+/** Separator header before listing new/untracked files. */
+export const NEW_FILES_HEADER = "\n\n--- New files (contents) ---\n";
+
+/** Message printed when preview is truncated. */
+export const TRUNCATED_LINE = "... (truncated) ...";
+
+/** Label prefix for each file entry. */
+export const FILE_LABEL = "File: ";
+
+/** Error message when neither diff nor new files are found. */
+export const ERROR_NO_CHANGES =
+  "No changes found: neither diffs nor new files.";
+
+/** Default filename for generated prompt output */
+export const DEFAULT_OUTPUT_FILENAME = "generated-prompt.txt";
+
 /** Console preview default lines */
 export const MAX_CONSOLE_LINES_DEFAULT = 10;
 

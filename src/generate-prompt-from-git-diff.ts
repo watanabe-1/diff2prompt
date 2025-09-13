@@ -8,7 +8,15 @@ import {
   MAX_NEWFILE_SIZE_BYTES,
   DEFAULT_MAX_BUFFER,
   TEMPLATE_PRESETS,
+  ERROR_NO_CHANGES,
+  FILE_LABEL,
+  NEW_FILES_HEADER,
+  PREVIEW_HEADER,
+  TRUNCATED_LINE,
+  DEFAULT_OUTPUT_FILENAME,
 } from "./constants";
+import { GIT_CMD_DIFF, GIT_CMD_ROOT, GIT_CMD_UNTRACKED } from "./git-constants";
+import { tooLargeSkipped, binarySkipped, readError } from "./strings";
 
 const exec = promisify(cpExec);
 
@@ -94,43 +102,40 @@ export function renderTemplate(
 }
 
 export async function collectDiff(opt: Options): Promise<string> {
-  const diff = await runGit("git diff && git diff --cached", opt);
+  const diff = await runGit(GIT_CMD_DIFF, opt);
   let full = diff.trim();
 
   if (opt.includeUntracked) {
-    const filesStdout = await runGit(
-      "git ls-files --others --exclude-standard",
-      opt
-    );
+    const filesStdout = await runGit(GIT_CMD_UNTRACKED, opt);
     const files = filesStdout
       .split("\n")
       .map((s) => s.trim())
       .filter(Boolean);
 
     if (files.length > 0) {
-      full += "\n\n--- New files (contents) ---\n";
+      full += NEW_FILES_HEADER;
       for (const file of files) {
         try {
           const st = await stat(file);
           if (st.size > opt.maxNewFileSizeBytes) {
-            full += `\nFile: ${file}\n<skipped: too large (${st.size} bytes)>\n`;
+            full += `\n${FILE_LABEL}${file}\n${tooLargeSkipped(st.size)}\n`;
             continue;
           }
           const buf = await readFile(file);
           if (looksBinary(buf)) {
-            full += `\nFile: ${file}\n<binary content skipped (${st.size} bytes)>\n`;
+            full += `\n${FILE_LABEL}${file}\n${binarySkipped(st.size)}\n`;
           } else {
-            full += `\nFile: ${file}\n${buf.toString("utf8")}\n`;
+            full += `\n${FILE_LABEL}${file}\n${buf.toString("utf8")}\n`;
           }
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
-          full += `\nFile: ${file}\n<read error: ${msg}>\n`;
+          full += `\n${FILE_LABEL}${file}\n${readError(msg)}\n`;
         }
       }
     }
 
     if (!full.trim()) {
-      throw new Error("No changes found: neither diffs nor new files.");
+      throw new Error(ERROR_NO_CHANGES);
     }
   }
 
@@ -138,12 +143,12 @@ export async function collectDiff(opt: Options): Promise<string> {
 }
 
 export function printPreview(prompt: string, maxLines: number) {
-  console.log("\n--- Prompt for ChatGPT (preview) ---\n");
+  console.log(PREVIEW_HEADER);
   const lines = prompt.split("\n");
   for (const line of lines.slice(0, Math.max(0, maxLines))) {
     console.log(line);
   }
-  if (lines.length > maxLines) console.log("... (truncated) ...");
+  if (lines.length > maxLines) console.log(TRUNCATED_LINE);
 }
 
 export async function main() {
@@ -160,12 +165,12 @@ export async function main() {
   if (!merged.outputPath) {
     merged.outputPath = join(
       repoRoot || __DIRNAME_SAFE,
-      "generated-prompt.txt"
+      DEFAULT_OUTPUT_FILENAME
     );
   }
 
   try {
-    await runGit("git rev-parse --show-toplevel", merged);
+    await runGit(GIT_CMD_ROOT, merged);
 
     const patchContent = await collectDiff(merged);
 

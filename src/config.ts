@@ -2,6 +2,7 @@ import { exec as cpExec } from "child_process";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { promisify } from "util";
+import { DEFAULT_OUTPUT_FILENAME } from "./constants";
 import type { Options } from "./generate-prompt-from-git-diff";
 
 const exec = promisify(cpExec);
@@ -207,13 +208,12 @@ export async function loadUserConfig(
 export function resolveDefaultOutputPath(
   repoRoot: string | null,
   fallbackDir: string,
-  filename = "generated-prompt.txt"
+  filename = DEFAULT_OUTPUT_FILENAME
 ): string {
   const base = repoRoot ?? fallbackDir;
 
   return join(base, filename);
 }
-
 /** Merge Options in the order: defaults → file config → CLI. */
 export function mergeOptions(
   defaults: Options,
