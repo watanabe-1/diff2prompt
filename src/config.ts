@@ -13,10 +13,13 @@ export type UserConfig = Partial<{
   includeUntracked: boolean;
   maxNewFileSizeBytes: number;
   maxBuffer: number;
+  promptTemplate?: string; // inline template text
+  promptTemplateFile?: string; // absolute path to a template file
+  templatePreset?: "default" | "minimal" | "ja" | string; // future-proof
 }>;
 
-// 値の型 V (例: string/number/boolean など) に"代入可能"なプロパティのキーを抽出
-// - IncludeOptional が true のときは undefined を無視して判定（Partial対策）
+// Extract keys whose value types are assignable to V (e.g., string/number/boolean).
+// - When IncludeOptional is true, ignore `undefined` in checks (works well with Partial<>).
 type KeysByType<T, V, IncludeOptional extends boolean = false> = {
   [K in keyof T]-?: IncludeOptional extends true
     ? NonNullable<T[K]> extends V
@@ -113,11 +116,11 @@ function pickBoolean(
 }
 
 export function isAbsolutePath(p: string): boolean {
-  // Windows drive or UNC or posix absolute
+  // Windows drive, UNC, or POSIX absolute
   return /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith("\\\\") || p.startsWith("/");
 }
 
-/** 設定ファイルの raw を Options 部分集合へ正規化（パス解決込み） */
+/** Normalize a raw config value into a partial Options object (with path resolution). */
 export function normalizeUserConfig(
   cfgRaw: unknown,
   baseDir: string
@@ -146,6 +149,9 @@ export function normalizeUserConfig(
   const includeUntracked = pickBoolean(cfgRaw, "includeUntracked");
   const maxNewFileSizeBytes = pickNumber(cfgRaw, "maxNewFileSizeBytes");
   const maxBuffer = pickNumber(cfgRaw, "maxBuffer");
+  const promptTemplate = pickString(cfgRaw, "promptTemplate");
+  const promptTemplateFile = pickString(cfgRaw, "promptTemplateFile");
+  const templatePreset = pickString(cfgRaw, "templatePreset");
 
   if (typeof maxConsoleLines === "number")
     out.maxConsoleLines = maxConsoleLines;
@@ -154,21 +160,28 @@ export function normalizeUserConfig(
   if (typeof maxNewFileSizeBytes === "number")
     out.maxNewFileSizeBytes = maxNewFileSizeBytes;
   if (typeof maxBuffer === "number") out.maxBuffer = maxBuffer;
+  if (typeof promptTemplate === "string") out.promptTemplate = promptTemplate;
+  if (typeof promptTemplateFile === "string" && promptTemplateFile.trim()) {
+    out.promptTemplateFile = isAbsolutePath(promptTemplateFile)
+      ? promptTemplateFile
+      : join(baseDir, promptTemplateFile);
+  }
+  if (typeof templatePreset === "string") out.templatePreset = templatePreset;
 
   return out;
 }
 
-/** 設定ファイルの探索 & 読み込み（優先順位順） */
+/** Discover and load user config (in order of precedence). */
 export async function loadUserConfig(
   baseDir: string
 ): Promise<Partial<Options>> {
-  // 1) 明示パス（環境変数）
+  // 1) Explicit path via environment variable
   if (process.env.DIFF2PROMPT_CONFIG) {
     const cfg = await readJsonIfExists(process.env.DIFF2PROMPT_CONFIG);
     if (cfg) return normalizeUserConfig(cfg, baseDir);
   }
 
-  // 2) 既定の設定ファイル
+  // 2) Default config files
   const candidates = [
     join(baseDir, "diff2prompt.config.json"),
     join(baseDir, ".diff2promptrc"),
@@ -178,19 +191,19 @@ export async function loadUserConfig(
     if (cfg) return normalizeUserConfig(cfg, baseDir);
   }
 
-  // 3) package.json の diff2prompt フィールド
+  // 3) `diff2prompt` field inside package.json
   const pkgRaw = await readJsonIfExists(join(baseDir, "package.json"));
   if (isRecord(pkgRaw)) {
     const d2p = pkgRaw["diff2prompt"]; // unknown
     if (d2p !== undefined) {
-      return normalizeUserConfig(d2p, baseDir); // normalizeUserConfig accepts unknown
+      return normalizeUserConfig(d2p, baseDir); // accepts unknown
     }
   }
 
   return {};
 }
 
-/** 既定の出力先（repoRoot 優先、なければ cwd） */
+/** Default output path (prefer repoRoot; otherwise fall back to cwd). */
 export function resolveDefaultOutputPath(
   repoRoot: string | null,
   fallbackDir: string,
@@ -201,7 +214,7 @@ export function resolveDefaultOutputPath(
   return join(base, filename);
 }
 
-/** 既定値 → 設定ファイル → CLI の順でマージした Options を返す */
+/** Merge Options in the order: defaults → file config → CLI. */
 export function mergeOptions(
   defaults: Options,
   fileCfg: Partial<Options>,

@@ -3,6 +3,7 @@
 Turn your local Git changes into a clean, copy-pastable prompt for ChatGPT (including a **commit message**, **PR title**, and **branch name** suggestion).
 
 > ✅ Works with staged & unstaged diffs, optionally includes new/untracked files (with binary/huge-file safeguards), prints a console preview, and writes the full prompt to a file.
+> 🎨 Supports **custom prompt templates** (inline, file-based, or preset).
 
 ---
 
@@ -22,13 +23,16 @@ pnpm diff2prompt
 By default, the tool:
 
 - Reads your current repo’s diffs (`git diff` & `git diff --cached`)
+
 - Optionally appends the contents of **untracked** files
+
 - Generates a structured prompt that asks ChatGPT to output:
   - **Commit message** (Conventional Commits)
   - **PR title** (mirrors the commit)
   - **Branch name** (scoped kebab-case)
 
 - Prints a **preview** (first N lines) to the console
+
 - Writes the **full prompt** to `generated-prompt.txt` at the repo root
 
 ---
@@ -36,7 +40,8 @@ By default, the tool:
 ## CLI usage
 
 ```bash
-diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--max-buffer=BYTES]
+diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--max-buffer=BYTES] \
+            [--template=STRING] [--template-file=PATH] [--template-preset=NAME]
 ```
 
 ### Flags
@@ -56,6 +61,15 @@ diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--
 
 - `--max-buffer=BYTES`
   Pass-through to `child_process.exec` for large diffs. Default: `50 * 1024 * 1024`.
+
+- `--template=STRING`
+  Inline template string. Placeholders: `{{diff}}`, `{{now}}`, `{{repoRoot}}`.
+
+- `--template-file=PATH`
+  Load template from a file (absolute or relative to repo root).
+
+- `--template-preset=NAME`
+  Use a built-in preset (currently `default`, `minimal`, `ja`). Falls back to `default` if unknown.
 
 ### Environment variables
 
@@ -77,23 +91,55 @@ You can set persistent defaults via any of the following (first match wins):
 
 ```json
 {
-  "outputPath": "generated-prompt.txt", // absolute or relative to repo root
-  "outputFile": "generated-prompt.txt", // same as outputPath (alternative key)
+  "outputPath": "generated-prompt.txt",
+  "outputFile": "generated-prompt.txt",
   "maxConsoleLines": 15,
   "includeUntracked": true,
   "maxNewFileSizeBytes": 1000000,
-  "maxBuffer": 52428800
+  "maxBuffer": 52428800,
+  "promptTemplate": "Commit: {{diff}}",
+  "promptTemplateFile": ".github/prompt.tpl.md",
+  "templatePreset": "minimal"
 }
 ```
 
 - `outputPath` takes precedence over `outputFile` if both are present.
+- `promptTemplate` (inline string) has the highest priority, then `promptTemplateFile`, then `templatePreset`, then built-in default.
 - Relative paths are resolved against the repo root.
 
 ---
 
-## What the prompt looks like
+## Template system
 
-The generated prompt asks ChatGPT to produce **all three** items in a strict format:
+Templates are plain text with `{{placeholders}}`. Supported placeholders:
+
+- `{{diff}}` — the collected git diff + untracked files
+- `{{now}}` — ISO8601 timestamp at generation
+- `{{repoRoot}}` — repository root path (empty if unknown)
+
+### Example template file (`.github/prompt.tpl.md`)
+
+```md
+# Custom Prompt
+
+Time: {{now}}
+Repo: {{repoRoot}}
+
+Changes:
+{{diff}}
+
+Please output:
+
+- Commit message
+- PR title
+- Branch name
+```
+
+---
+
+## What the default prompt looks like
+
+The built-in `default` template asks ChatGPT to produce **all three** items:
 
 ```txt
 Commit message: <type>(<optional-scope>): <message>
@@ -116,7 +162,7 @@ It also includes guidance for Conventional Commits types, scope examples, and br
   - **Large files** over `maxNewFileSizeBytes` are **skipped** with size info.
 
 - **Preview**
-  Prints a header and the first N lines (configurable) to help you sanity-check before opening the output file.
+  Prints a header and the first N lines (configurable).
 
 - **Output**
   Full prompt is written to the configured `outputPath`. Default is `<repoRoot>/generated-prompt.txt`.
@@ -135,17 +181,23 @@ It also includes guidance for Conventional Commits types, scope examples, and br
 # Use a custom output file
 diff2prompt --out=.tmp/prompt.txt
 
-# Preview 30 lines in console, keep default output path
+# Preview 30 lines
 diff2prompt --lines=30
 
-# Ignore untracked files entirely
+# Ignore untracked files
 diff2prompt --no-untracked
 
 # Allow very large diffs
 diff2prompt --max-buffer=104857600
 
-# Keep only small new files (e.g., docs/snippets)
-diff2prompt --max-new-size=200000
+# Use inline template
+diff2prompt --template="Repo: {{repoRoot}}\n\n{{diff}}"
+
+# Use template file
+diff2prompt --template-file=.github/prompt.tpl.md
+
+# Use minimal preset
+diff2prompt --template-preset=minimal
 ```
 
 ---
@@ -163,16 +215,16 @@ A: Binary detection avoids pasting unreadable data into the prompt (and blowing 
 ## Contributing
 
 1. Fork and create a feature branch.
+
 2. Add tests for new behaviors.
+
 3. Run the checks:
 
    ```bash
    bun run lint && bun run test
    ```
 
-4. Open a PR with a clear description and screenshots/logs if helpful.
-
-> Tip: The project itself uses the tool to craft PR prompts—dogfooding encouraged!
+4. Open a PR with a clear description and logs/screenshots if helpful.
 
 ---
 

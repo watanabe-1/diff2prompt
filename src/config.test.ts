@@ -33,7 +33,7 @@ const execState = ((globalThis as any).__execState__ ??= {
 vi.mock("child_process", async () => {
   const { promisify } = await import("util");
 
-  // 既存 execState を拡張（shape を追加）
+  // Extend the existing execState (add the 'shape' discriminator)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const execState = ((globalThis as any).__execState__ ??= {
     stdout: "C:/repo\n",
@@ -52,11 +52,11 @@ vi.mock("child_process", async () => {
     }
     cb?.(null, execState.stdout, "");
 
-    // 返り値は互換用のダミー
+    // Return value is a compatibility dummy
     return { stdout: execState.stdout, stderr: "" } as unknown;
   }
 
-  // ここがポイント：promisify.custom で戻り値“の形”を切替
+  // Key point: switch the return "shape" via promisify.custom
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (rawExec as any)[promisify.custom] = (_: string) => {
     if (execState.throws) {
@@ -218,7 +218,7 @@ describe("getRepoRootSafe – full branch coverage", () => {
 
   it("handles array non string result [stdout, stderr]", async () => {
     execState.shape = "array";
-    execState.stdout = 1;
+    execState.stdout = 1 as unknown as string;
     const root = await getRepoRootSafe();
     expect(root).toBeNull();
   });
@@ -232,13 +232,13 @@ describe("getRepoRootSafe – full branch coverage", () => {
 
   it("handles object non string result { stdout, stderr }", async () => {
     execState.shape = "object";
-    execState.stdout = 1;
+    execState.stdout = 1 as unknown as string;
     const root = await getRepoRootSafe();
     expect(root).toBeNull();
   });
 
   it("returns null on empty stdout", async () => {
-    execState.shape = "string"; // 形は何でも良い
+    execState.shape = "string"; // any shape is fine here
     execState.stdout = "\n";
     const root = await getRepoRootSafe();
     expect(root).toBeNull();
@@ -326,5 +326,66 @@ describe("isAbsolutePath", () => {
   });
   it("detects relative path", () => {
     expect(isAbsolutePath("out/file.txt")).toBe(false);
+  });
+});
+
+describe("normalizeUserConfig (template fields)", () => {
+  it("keeps inline promptTemplate as-is", () => {
+    const cfg = normalizeUserConfig(
+      rec({ promptTemplate: "Hello {{diff}}" }),
+      "C:/repo"
+    );
+    expect(cfg.promptTemplate).toBe("Hello {{diff}}");
+  });
+
+  it("resolves relative promptTemplateFile against baseDir", () => {
+    const cfg = normalizeUserConfig(
+      rec({ promptTemplateFile: ".github/tpl.md" }),
+      "C:/repo"
+    );
+    expect(cfg.promptTemplateFile?.replace(/\\/g, "/")).toBe(
+      "C:/repo/.github/tpl.md"
+    );
+  });
+
+  it("accepts absolute promptTemplateFile as-is", () => {
+    const abs = "C:/abs/tpl.md";
+    const cfg = normalizeUserConfig(
+      rec({ promptTemplateFile: abs }),
+      "C:/repo"
+    );
+    expect(cfg.promptTemplateFile?.replace(/\\/g, "/")).toBe(
+      abs.replace(/\\/g, "/")
+    );
+  });
+
+  it("captures templatePreset string", () => {
+    const cfg = normalizeUserConfig(
+      rec({ templatePreset: "minimal" }),
+      "C:/repo"
+    );
+    expect(cfg.templatePreset).toBe("minimal");
+  });
+});
+
+describe("loadUserConfig (template fields precedence across sources)", () => {
+  beforeEach(() => {
+    mockFiles.clear();
+    delete process.env.DIFF2PROMPT_CONFIG;
+  });
+
+  it("env config wins (has promptTemplateFile)", async () => {
+    putFile("C:/repo/diff2prompt.config.json", { promptTemplate: "LOW" });
+    putFile("C:/repo/package.json", {
+      diff2prompt: { templatePreset: "minimal" },
+    });
+
+    process.env.DIFF2PROMPT_CONFIG = "C:/custom/cfg.json";
+    putFile("C:/custom/cfg.json", { promptTemplateFile: "T.tpl.md" });
+
+    const cfg = await loadUserConfig("C:/repo");
+    expect(cfg.promptTemplateFile?.endsWith("T.tpl.md")).toBe(true);
+    expect(cfg.promptTemplate).toBeUndefined();
+    expect(cfg.templatePreset).toBeUndefined();
   });
 });
