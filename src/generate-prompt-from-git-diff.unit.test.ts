@@ -1,12 +1,23 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mergeOptions, resolveDefaultOutputPath } from "./config";
 import {
   parseArgs,
   looksBinary,
-  generatePrompt,
   defaultOptions,
   Options,
+  renderTemplate,
 } from "../src/generate-prompt-from-git-diff";
+
+vi.mock("fs/promises", () => {
+  return {
+    readFile: vi.fn(async (path: string, _?: string) => {
+      if (path === "ok.txt") return "HELLO TEMPLATE";
+      throw new Error("fail");
+    }),
+  };
+});
+
+import { readTextFileIfExists } from "../src/generate-prompt-from-git-diff";
 
 describe("parseArgs", () => {
   it("parses flags correctly", () => {
@@ -31,23 +42,25 @@ describe("parseArgs", () => {
     const p = parseArgs(["node", "script"]);
     expect(p).toEqual({});
   });
+
+  it("parses --template, --template-file, --template-preset", () => {
+    const p = parseArgs([
+      "node",
+      "script",
+      "--template=INLINE {{diff}}",
+      "--template-file=tpl.md",
+      "--template-preset=minimal",
+    ]);
+    expect(p.promptTemplate).toBe("INLINE {{diff}}");
+    expect(p.promptTemplateFile).toBe("tpl.md");
+    expect(p.templatePreset).toBe("minimal");
+  });
 });
 
 describe("looksBinary", () => {
   it("detects binary when buffer includes NUL", () => {
     expect(looksBinary(Buffer.from([0x01, 0x00, 0x02]))).toBe(true);
     expect(looksBinary(Buffer.from("hello", "utf8"))).toBe(false);
-  });
-});
-
-describe("generatePrompt", () => {
-  it("includes given diff and output headings", () => {
-    const s = generatePrompt("diff --git a/x b/x");
-    expect(s).toContain("Here is the diff of the modifications:");
-    expect(s).toContain("diff --git a/x b/x");
-    expect(s).toContain("Commit message:");
-    expect(s).toContain("PR title:");
-    expect(s).toContain("Branch:");
   });
 });
 
@@ -92,5 +105,26 @@ describe("merge behavior (defaults -> file -> cli)", () => {
   it("resolveDefaultOutputPath can use custom filename (internal helper)", () => {
     const p = resolveDefaultOutputPath("C:/repo", "C:/cwd", "my.txt");
     expect(p.replace(/\\/g, "/")).toBe("C:/repo/my.txt".replace(/\\/g, "/"));
+  });
+});
+
+describe("readTextFileIfExists", () => {
+  it("returns file contents when readFile succeeds", async () => {
+    const txt = await readTextFileIfExists("ok.txt");
+    expect(txt).toBe("HELLO TEMPLATE");
+  });
+
+  it("returns null when readFile throws", async () => {
+    const txt = await readTextFileIfExists("missing.txt");
+    expect(txt).toBeNull();
+  });
+});
+
+describe("renderTemplate", () => {
+  it("replaces existing keys and falls back to empty string for missing keys", () => {
+    const tpl = "A={{a}}, B={{b}}, C={{c}}";
+    const out = renderTemplate(tpl, { a: "X", c: "Z" });
+    // b は存在しないので空文字に置換される
+    expect(out).toBe("A=X, B=, C=Z");
   });
 });

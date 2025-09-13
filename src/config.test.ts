@@ -328,3 +328,64 @@ describe("isAbsolutePath", () => {
     expect(isAbsolutePath("out/file.txt")).toBe(false);
   });
 });
+
+describe("normalizeUserConfig (template fields)", () => {
+  it("keeps inline promptTemplate as-is", () => {
+    const cfg = normalizeUserConfig(
+      rec({ promptTemplate: "Hello {{diff}}" }),
+      "C:/repo"
+    );
+    expect(cfg.promptTemplate).toBe("Hello {{diff}}");
+  });
+
+  it("resolves relative promptTemplateFile against baseDir", () => {
+    const cfg = normalizeUserConfig(
+      rec({ promptTemplateFile: ".github/tpl.md" }),
+      "C:/repo"
+    );
+    expect(cfg.promptTemplateFile?.replace(/\\/g, "/")).toBe(
+      "C:/repo/.github/tpl.md"
+    );
+  });
+
+  it("accepts absolute promptTemplateFile as-is", () => {
+    const abs = "C:/abs/tpl.md";
+    const cfg = normalizeUserConfig(
+      rec({ promptTemplateFile: abs }),
+      "C:/repo"
+    );
+    expect(cfg.promptTemplateFile?.replace(/\\/g, "/")).toBe(
+      abs.replace(/\\/g, "/")
+    );
+  });
+
+  it("captures templatePreset string", () => {
+    const cfg = normalizeUserConfig(
+      rec({ templatePreset: "minimal" }),
+      "C:/repo"
+    );
+    expect(cfg.templatePreset).toBe("minimal");
+  });
+});
+
+describe("loadUserConfig (template fields precedence across sources)", () => {
+  beforeEach(() => {
+    mockFiles.clear();
+    delete process.env.DIFF2PROMPT_CONFIG;
+  });
+
+  it("env config wins (has promptTemplateFile)", async () => {
+    putFile("C:/repo/diff2prompt.config.json", { promptTemplate: "LOW" });
+    putFile("C:/repo/package.json", {
+      diff2prompt: { templatePreset: "minimal" },
+    });
+
+    process.env.DIFF2PROMPT_CONFIG = "C:/custom/cfg.json";
+    putFile("C:/custom/cfg.json", { promptTemplateFile: "T.tpl.md" });
+
+    const cfg = await loadUserConfig("C:/repo");
+    expect(cfg.promptTemplateFile?.endsWith("T.tpl.md")).toBe(true);
+    expect(cfg.promptTemplate).toBeUndefined();
+    expect(cfg.templatePreset).toBeUndefined();
+  });
+});

@@ -13,6 +13,9 @@ export type UserConfig = Partial<{
   includeUntracked: boolean;
   maxNewFileSizeBytes: number;
   maxBuffer: number;
+  promptTemplate?: string; // inline template text
+  promptTemplateFile?: string; // absolute path to a template file
+  templatePreset?: "default" | "minimal" | "ja" | string; // future-proof
 }>;
 
 // 値の型 V (例: string/number/boolean など) に"代入可能"なプロパティのキーを抽出
@@ -146,6 +149,9 @@ export function normalizeUserConfig(
   const includeUntracked = pickBoolean(cfgRaw, "includeUntracked");
   const maxNewFileSizeBytes = pickNumber(cfgRaw, "maxNewFileSizeBytes");
   const maxBuffer = pickNumber(cfgRaw, "maxBuffer");
+  const promptTemplate = pickString(cfgRaw, "promptTemplate");
+  const promptTemplateFile = pickString(cfgRaw, "promptTemplateFile");
+  const templatePreset = pickString(cfgRaw, "templatePreset");
 
   if (typeof maxConsoleLines === "number")
     out.maxConsoleLines = maxConsoleLines;
@@ -154,6 +160,13 @@ export function normalizeUserConfig(
   if (typeof maxNewFileSizeBytes === "number")
     out.maxNewFileSizeBytes = maxNewFileSizeBytes;
   if (typeof maxBuffer === "number") out.maxBuffer = maxBuffer;
+  if (typeof promptTemplate === "string") out.promptTemplate = promptTemplate;
+  if (typeof promptTemplateFile === "string" && promptTemplateFile.trim()) {
+    out.promptTemplateFile = isAbsolutePath(promptTemplateFile)
+      ? promptTemplateFile
+      : join(baseDir, promptTemplateFile);
+  }
+  if (typeof templatePreset === "string") out.templatePreset = templatePreset;
 
   return out;
 }

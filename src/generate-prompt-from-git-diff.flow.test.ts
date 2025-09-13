@@ -93,14 +93,17 @@ vi.mock("fs/promises", () => {
     fsState.writes.push({ path, data, enc });
   });
 
-  const readFile = vi.fn(async (path: string): Promise<Buffer> => {
-    const f = fsState.files.get(path);
-    if (!f) throw new Error(`ENOENT: ${path}`);
-    if (f.err) throw f.err;
-    if (!f.buf) throw new Error("No buffer");
+  // NOTE: support both Buffer-return (no encoding) and string-return ("utf8")
+  const readFile = vi.fn(
+    async (path: string, enc?: string): Promise<unknown> => {
+      const f = fsState.files.get(path);
+      if (!f) throw new Error(`ENOENT: ${path}`);
+      if (f.err) throw f.err;
+      if (!f.buf) throw new Error("No buffer");
 
-    return f.buf;
-  });
+      return enc === "utf8" ? f.buf.toString("utf8") : f.buf;
+    }
+  );
 
   const stat = vi.fn(async (path: string): Promise<{ size: number }> => {
     const f = fsState.files.get(path);
@@ -365,5 +368,109 @@ describe("generate.ts flow", () => {
     const lastWrite = fsState.writes.at(-1)!;
     expect(lastWrite.path.endsWith("generated-prompt.txt")).toBe(true);
     expect(lastWrite.path.includes("/repo/")).toBe(false);
+  });
+
+  it("main(): uses promptTemplateFile and replaces {{diff}}, {{now}}, {{repoRoot}}", async () => {
+    // Git environment
+    gitMap.data.set("git rev-parse --show-toplevel", "/repo\n");
+    gitMap.data.set("git diff && git diff --cached", "DIFF-A\n");
+    gitMap.data.set("git ls-files --others --exclude-standard", "");
+
+    // Provide a template file in config
+    await vi.doMock("./config", () => ({
+      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn().mockResolvedValue({
+        promptTemplateFile: "/repo/.github/prompt.tpl.md",
+      }),
+    }));
+
+    // Template file content (utf8 string will be returned by our mock)
+    const tpl = [
+      "# Custom Prompt",
+      "Now: {{now}}",
+      "Root: {{repoRoot}}",
+      "",
+      "=== DIFF ===",
+      "{{diff}}",
+      "=== END ===",
+    ].join("\n");
+    fsState.files.set("/repo/.github/prompt.tpl.md", {
+      size: tpl.length,
+      buf: Buffer.from(tpl, "utf8"),
+    });
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--lines=100", "--out=/repo/OUT.txt"];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.path).toBe("/repo/OUT.txt");
+    expect(out.data).toContain("# Custom Prompt");
+    expect(out.data).toContain("Root: /repo");
+    expect(out.data).toContain("=== DIFF ===");
+    expect(out.data).toContain("DIFF-A");
+    expect(out.data).toMatch(/\bNow:\s+\d{4}-\d{2}-\d{2}T/); // ISO-ish timestamp present
+    // Ensure it's not the baked-in default paragraph (rough negative check)
+    expect(out.data).not.toContain("Please generate **all** of the following");
+  });
+
+  it("main(): template precedence CLI inline > file > preset > default", async () => {
+    // Git env
+    gitMap.data.set("git rev-parse --show-toplevel", "/repo\n");
+    gitMap.data.set("git diff && git diff --cached", "XYZ\n");
+    gitMap.data.set("git ls-files --others --exclude-standard", "");
+
+    // Config provides file & preset, but CLI will override with inline
+    await vi.doMock("./config", () => ({
+      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn().mockResolvedValue({
+        promptTemplateFile: "/repo/tpl.md",
+        templatePreset: "minimal",
+      }),
+    }));
+
+    // file exists but should be ignored due to CLI inline
+    const fileTpl = "FILE-TPL {{diff}}";
+    fsState.files.set("/repo/tpl.md", {
+      size: fileTpl.length,
+      buf: Buffer.from(fileTpl, "utf8"),
+    });
+
+    const { main } = await importSut();
+    process.argv = [
+      "node",
+      "script",
+      "--template=INLINE-TPL {{diff}} {{repoRoot}}",
+      "--out=/repo/O.txt",
+    ];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.data).toContain("INLINE-TPL XYZ /repo");
+    expect(out.data).not.toContain("FILE-TPL");
+    // Not the default verbose template
+    expect(out.data).not.toContain("Please generate **all** of the following");
+  });
+
+  it("main(): falls back to preset when no file/inline provided", async () => {
+    gitMap.data.set("git rev-parse --show-toplevel", "/repo\n");
+    gitMap.data.set("git diff && git diff --cached", "ABC\n");
+    gitMap.data.set("git ls-files --others --exclude-standard", "");
+
+    await vi.doMock("./config", () => ({
+      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn().mockResolvedValue({
+        templatePreset: "minimal",
+      }),
+    }));
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--out=/repo/PRESET.txt"];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    // minimal preset is intentionally short; check that diff is present and default marker absent
+    expect(out.data).toContain("ABC");
+    expect(out.data).not.toContain("Please generate **all** of the following");
   });
 });

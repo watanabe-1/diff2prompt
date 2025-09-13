@@ -21,49 +21,16 @@ export interface Options {
   includeUntracked: boolean;
   maxNewFileSizeBytes: number;
   maxBuffer: number;
+  promptTemplate?: string; // inline template text
+  promptTemplateFile?: string; // absolute path to a template file
+  templatePreset?: "default" | "minimal" | "ja" | string; // future-proof
 }
 
-export const defaultOptions: Options = {
-  maxConsoleLines:
-    Number(process.env.MAX_CONSOLE_LINES) || MAX_CONSOLE_LINES_DEFAULT,
-  outputPath: "", // temp, set in main()
-  includeUntracked: true,
-  maxNewFileSizeBytes: MAX_NEWFILE_SIZE_BYTES,
-  maxBuffer: 50 * 1024 * 1024,
-};
-
-export function parseArgs(argv: string[]): Partial<Options> {
-  const out: Partial<Options> = {};
-  for (const a of argv.slice(2)) {
-    if (a.startsWith("--lines=")) out.maxConsoleLines = Number(a.split("=")[1]);
-    else if (a === "--no-untracked") out.includeUntracked = false;
-    else if (a.startsWith("--out=")) out.outputPath = a.split("=")[1]!;
-    else if (a.startsWith("--max-new-size="))
-      out.maxNewFileSizeBytes = Number(a.split("=")[1]);
-    else if (a.startsWith("--max-buffer="))
-      out.maxBuffer = Number(a.split("=")[1]);
-  }
-
-  return out;
-}
-
-export async function runGit(cmd: string, opt: Options): Promise<string> {
-  const { stdout } = (await exec(cmd, {
-    maxBuffer: opt.maxBuffer,
-  })) as ExecResult;
-
-  return stdout;
-}
-
-export function looksBinary(buf: Buffer): boolean {
-  return buf.includes(0);
-}
-
-export function generatePrompt(patchContent: string): string {
-  return `
+const PRESETS: Record<string, string> = {
+  default: `
 I made changes to the following code. Here is the diff of the modifications:
 
-${patchContent}
+{{diff}}
 
 Please generate **all** of the following based on the diff:
 
@@ -99,7 +66,87 @@ Please generate **all** of the following based on the diff:
 Commit message: <type>(<optional-scope>): <message>
 PR title: <type>(<optional-scope>): <message>
 Branch: <type>[/<scope>]/<short-kebab-slug>
-  `.trim();
+`.trim(),
+
+  minimal: `
+{{diff}}
+
+Please output:
+- Commit: <type>(<scope?>): <message>
+- PR: same as commit
+- Branch: <type>[/<scope>]/<slug>
+`.trim(),
+
+  ja: `
+次の差分に基づいて、コミットメッセージ（Conventional Commits）、PRタイトル（コミットと同一）、ブランチ名（<type>[/<scope>]/<slug>）を生成してください。
+
+差分:
+{{diff}}
+`.trim(),
+};
+
+export const defaultOptions: Options = {
+  maxConsoleLines:
+    Number(process.env.MAX_CONSOLE_LINES) || MAX_CONSOLE_LINES_DEFAULT,
+  outputPath: "", // temp, set in main()
+  includeUntracked: true,
+  maxNewFileSizeBytes: MAX_NEWFILE_SIZE_BYTES,
+  maxBuffer: 50 * 1024 * 1024,
+};
+
+export function parseArgs(argv: string[]): Partial<Options> {
+  const out: Partial<Options> = {};
+  for (const a of argv.slice(2)) {
+    if (a.startsWith("--lines=")) out.maxConsoleLines = Number(a.split("=")[1]);
+    else if (a === "--no-untracked") out.includeUntracked = false;
+    else if (a.startsWith("--out=")) out.outputPath = a.split("=")[1]!;
+    else if (a.startsWith("--max-new-size="))
+      out.maxNewFileSizeBytes = Number(a.split("=")[1]);
+    else if (a.startsWith("--max-buffer="))
+      out.maxBuffer = Number(a.split("=")[1]);
+    else if (a.startsWith("--template-file="))
+      out.promptTemplateFile = a.split("=")[1]!;
+    else if (a.startsWith("--template="))
+      out.promptTemplate = a.slice("--template=".length);
+    else if (a.startsWith("--template-preset="))
+      out.templatePreset = a.split("=")[1]!;
+  }
+
+  return out;
+}
+
+export async function runGit(cmd: string, opt: Options): Promise<string> {
+  const { stdout } = (await exec(cmd, {
+    maxBuffer: opt.maxBuffer,
+  })) as ExecResult;
+
+  return stdout;
+}
+
+export function looksBinary(buf: Buffer): boolean {
+  return buf.includes(0);
+}
+
+export async function readTextFileIfExists(
+  path: string
+): Promise<string | null> {
+  try {
+    const buf = await readFile(path, "utf8");
+
+    return String(buf);
+  } catch {
+    return null;
+  }
+}
+
+export function renderTemplate(
+  tpl: string,
+  data: Record<string, string>
+): string {
+  // シンプルな {{key}} 置換（エスケープ不要な生埋め）
+  return tpl.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, k) => {
+    return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : "";
+  });
 }
 
 export async function collectDiff(opt: Options): Promise<string> {
@@ -156,23 +203,16 @@ export function printPreview(prompt: string, maxLines: number) {
 }
 
 export async function main() {
-  // Try to detect repo root first (do not fail hard here)
   const repoRoot = (await getRepoRootSafe()) ?? process.cwd();
-
-  // Load config file(s)
   const fileCfg = await loadUserConfig(repoRoot);
-
-  // CLI
   const cli = parseArgs(process.argv);
 
-  // Merge: defaults -> fileCfg -> CLI
   const merged: Options = {
     ...defaultOptions,
     ...fileCfg,
     ...cli,
   };
 
-  // Finalize default outputPath if still empty
   if (!merged.outputPath) {
     merged.outputPath = join(
       repoRoot || __DIRNAME_SAFE,
@@ -181,11 +221,38 @@ export async function main() {
   }
 
   try {
-    // Keep the hard check so command fails outside a git repo
     await runGit("git rev-parse --show-toplevel", merged);
 
     const patchContent = await collectDiff(merged);
-    const prompt = generatePrompt(patchContent);
+
+    // === 優先度 inline > file > preset > default  ===
+    let templateText: string | undefined;
+
+    // 1) CLI/設定のインラインが最優先
+    if (merged.promptTemplate && merged.promptTemplate.trim()) {
+      templateText = merged.promptTemplate.trim();
+    } else if (merged.promptTemplateFile) {
+      // 2) テンプレファイル
+      const txt = await readTextFileIfExists(merged.promptTemplateFile);
+      templateText = txt?.trim();
+    }
+
+    // 3) プリセット or 4) 既定
+    if (!templateText || templateText.length === 0) {
+      if (merged.templatePreset && PRESETS[merged.templatePreset]) {
+        templateText = PRESETS[merged.templatePreset];
+      } else {
+        templateText = PRESETS.default;
+      }
+    }
+
+    const nowIso = new Date().toISOString();
+    const prompt = renderTemplate(templateText, {
+      diff: patchContent,
+      now: nowIso,
+      repoRoot: repoRoot,
+    });
+
     printPreview(prompt, merged.maxConsoleLines);
     await writeFile(merged.outputPath, prompt, "utf8");
     console.log(`\nPrompt written to: ${merged.outputPath}`);
