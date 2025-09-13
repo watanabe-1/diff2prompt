@@ -124,7 +124,7 @@ describe("renderTemplate", () => {
   it("replaces existing keys and falls back to empty string for missing keys", () => {
     const tpl = "A={{a}}, B={{b}}, C={{c}}";
     const out = renderTemplate(tpl, { a: "X", c: "Z" });
-    // b は存在しないので空文字に置換される
+    // Since "b" doesn't exist, it should be replaced with an empty string.
     expect(out).toBe("A=X, B=, C=Z");
   });
 });

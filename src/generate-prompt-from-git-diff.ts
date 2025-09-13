@@ -88,7 +88,7 @@ Please output:
 export const defaultOptions: Options = {
   maxConsoleLines:
     Number(process.env.MAX_CONSOLE_LINES) || MAX_CONSOLE_LINES_DEFAULT,
-  outputPath: "", // temp, set in main()
+  outputPath: "", // temporary, set in main()
   includeUntracked: true,
   maxNewFileSizeBytes: MAX_NEWFILE_SIZE_BYTES,
   maxBuffer: 50 * 1024 * 1024,
@@ -143,7 +143,7 @@ export function renderTemplate(
   tpl: string,
   data: Record<string, string>
 ): string {
-  // シンプルな {{key}} 置換（エスケープ不要な生埋め）
+  // Simple {{key}} replacement (raw substitution without escaping)
   return tpl.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, k) => {
     return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : "";
   });
@@ -225,19 +225,19 @@ export async function main() {
 
     const patchContent = await collectDiff(merged);
 
-    // === 優先度 inline > file > preset > default  ===
+    // === Priority: inline > file > preset > default ===
     let templateText: string | undefined;
 
-    // 1) CLI/設定のインラインが最優先
+    // 1) Inline CLI/config template has the highest priority
     if (merged.promptTemplate && merged.promptTemplate.trim()) {
       templateText = merged.promptTemplate.trim();
     } else if (merged.promptTemplateFile) {
-      // 2) テンプレファイル
+      // 2) Template file
       const txt = await readTextFileIfExists(merged.promptTemplateFile);
       templateText = txt?.trim();
     }
 
-    // 3) プリセット or 4) 既定
+    // 3) Preset or 4) Default
     if (!templateText || templateText.length === 0) {
       if (merged.templatePreset && PRESETS[merged.templatePreset]) {
         templateText = PRESETS[merged.templatePreset];
