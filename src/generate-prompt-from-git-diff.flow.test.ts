@@ -287,4 +287,83 @@ describe("generate.ts flow", () => {
     // catch 側で String(err) → "STRINGY_FAIL" が出る
     expect(errOut).toContain("Error: STRINGY_FAIL");
   });
+
+  it("main(): default output uses repoRoot when provided (LHS of ||)", async () => {
+    vi.resetModules();
+
+    // child_process 側の git コマンドは成功に
+    gitMap.reset();
+    gitMap.data.set("git rev-parse --show-toplevel", "/repo\n");
+    gitMap.data.set("git diff && git diff --cached", "DIFF\n");
+    gitMap.data.set("git ls-files --others --exclude-standard", "");
+
+    // repoRoot をモック（/repo）
+    await vi.doMock("./config", () => ({
+      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn().mockResolvedValue({}),
+    }));
+
+    // path.join をスパイ化して引数を検証
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const joinSpy: any = vi.fn((a: string, b: string) => `${a}/${b}`);
+    await vi.doMock("path", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const real = await vi.importActual<any>("path");
+
+      return { ...real, join: (...args: string[]) => joinSpy(...args) };
+    });
+
+    // SUT 読み込み後に main 実行（--out は与えない → デフォルト出力パス分岐へ）
+    const { main } = await importSut();
+    process.argv = ["node", "script"]; // no --out
+    await main();
+
+    // repoRoot がそのまま join の第1引数に使われている
+    expect(joinSpy).toHaveBeenCalledWith("/repo", "generated-prompt.txt");
+    // 実際に書き込まれたパスも /repo 由来
+    const lastWrite = fsState.writes.at(-1)!;
+    expect(lastWrite.path).toContain("/repo/");
+    expect(lastWrite.path.endsWith("generated-prompt.txt")).toBe(true);
+  });
+
+  it("main(): default output falls back to __DIRNAME_SAFE when repoRoot is empty string (RHS of ||)", async () => {
+    vi.resetModules();
+
+    // git コマンドは成功に
+    gitMap.reset();
+    gitMap.data.set("git rev-parse --show-toplevel", "/ignored\n"); // main 内のハードチェック用
+    gitMap.data.set("git diff && git diff --cached", "DIFF\n");
+    gitMap.data.set("git ls-files --others --exclude-standard", "");
+
+    // repoRoot を空文字で返す → falsy → __DIRNAME_SAFE 側へ
+    await vi.doMock("./config", () => ({
+      getRepoRootSafe: vi.fn().mockResolvedValue(""),
+      loadUserConfig: vi.fn().mockResolvedValue({}),
+    }));
+
+    // join の第1引数を観察するためスパイ化
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const joinSpy: any = vi.fn((a: string, b: string) => `${a}/${b}`);
+    await vi.doMock("path", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const real = await vi.importActual<any>("path");
+
+      return { ...real, join: (...args: string[]) => joinSpy(...args) };
+    });
+
+    const { main } = await importSut();
+    process.argv = ["node", "script"]; // no --out
+    await main();
+
+    // join の第1引数は「空文字でも /repo でもない」＝ __DIRNAME_SAFE 由来
+    const [firstArg, secondArg] = joinSpy.mock.calls.at(-1)!;
+    expect(secondArg).toBe("generated-prompt.txt");
+    expect(firstArg).not.toBe("");
+    expect(firstArg).not.toBe("/repo");
+
+    // 実際の書き込みパスも repoRoot ではなく __DIRNAME_SAFE から生成されている
+    const lastWrite = fsState.writes.at(-1)!;
+    expect(lastWrite.path.endsWith("generated-prompt.txt")).toBe(true);
+    expect(lastWrite.path.includes("/repo/")).toBe(false);
+  });
 });
