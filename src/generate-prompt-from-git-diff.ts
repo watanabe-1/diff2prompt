@@ -3,11 +3,14 @@ import { readFile, writeFile, stat } from "fs/promises";
 import { join } from "path";
 import { promisify } from "util";
 import { getRepoRootSafe, loadUserConfig } from "./config";
+import {
+  MAX_CONSOLE_LINES_DEFAULT,
+  MAX_NEWFILE_SIZE_BYTES,
+  DEFAULT_MAX_BUFFER,
+  TEMPLATE_PRESETS,
+} from "./constants";
 
 const exec = promisify(cpExec);
-
-export const MAX_CONSOLE_LINES_DEFAULT = 10;
-export const MAX_NEWFILE_SIZE_BYTES = 1_000_000; // 1MB
 
 const __DIRNAME_SAFE =
   /* c8 ignore next */
@@ -26,72 +29,13 @@ export interface Options {
   templatePreset?: "default" | "minimal" | "ja" | string; // future-proof
 }
 
-const PRESETS: Record<string, string> = {
-  default: `
-I made changes to the following code. Here is the diff of the modifications:
-
-{{diff}}
-
-Please generate **all** of the following based on the diff:
-
-1) **Commit message** (single line), using one of:
-   - feat: Adding a new feature
-   - fix: Bug fix
-   - refactor: Code refactoring
-   - update: Improvements or updates to existing functionality
-   - docs: Documentation changes
-   - chore: Build-related or tool configuration changes
-   - test: Adding or modifying tests
-
-   Use Conventional Commits format with an **optional scope**:
-   Format: <type>(<optional-scope>): <message>
-   - Keep message concise (≤ 72 chars if possible), sentence case.
-   - Prefer scopes when clear from the diff. Examples:
-     - deps / deps-dev
-     - ci
-     - docs
-     - test
-     - build
-     - perf, security, etc.
-
-2) **PR title**: mirror the commit message exactly.
-
-3) **Branch name**:
-   - Lowercase kebab-case, ASCII [a–z0–9-] only.
-   - Prefix "<type>/" and include "/<scope>" if used.
-   - ≤ 40 chars after the prefix.
-
-**Output format:**
-
-Commit message: <type>(<optional-scope>): <message>
-PR title: <type>(<optional-scope>): <message>
-Branch: <type>[/<scope>]/<short-kebab-slug>
-`.trim(),
-
-  minimal: `
-{{diff}}
-
-Please output:
-- Commit: <type>(<scope?>): <message>
-- PR: same as commit
-- Branch: <type>[/<scope>]/<slug>
-`.trim(),
-
-  ja: `
-次の差分に基づいて、コミットメッセージ（Conventional Commits）、PRタイトル（コミットと同一）、ブランチ名（<type>[/<scope>]/<slug>）を生成してください。
-
-差分:
-{{diff}}
-`.trim(),
-};
-
 export const defaultOptions: Options = {
   maxConsoleLines:
     Number(process.env.MAX_CONSOLE_LINES) || MAX_CONSOLE_LINES_DEFAULT,
   outputPath: "", // temporary, set in main()
   includeUntracked: true,
   maxNewFileSizeBytes: MAX_NEWFILE_SIZE_BYTES,
-  maxBuffer: 50 * 1024 * 1024,
+  maxBuffer: DEFAULT_MAX_BUFFER,
 };
 
 export function parseArgs(argv: string[]): Partial<Options> {
@@ -239,10 +183,10 @@ export async function main() {
 
     // 3) Preset or 4) Default
     if (!templateText || templateText.length === 0) {
-      if (merged.templatePreset && PRESETS[merged.templatePreset]) {
-        templateText = PRESETS[merged.templatePreset];
+      if (merged.templatePreset && TEMPLATE_PRESETS[merged.templatePreset]) {
+        templateText = TEMPLATE_PRESETS[merged.templatePreset];
       } else {
-        templateText = PRESETS.default;
+        templateText = TEMPLATE_PRESETS.default;
       }
     }
 
