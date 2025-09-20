@@ -1,4 +1,3 @@
-// ===== src/generate-prompt-from-git-diff.ts =====
 import { exec as cpExec } from "child_process";
 import { readFile, writeFile, stat } from "fs/promises";
 import { join } from "path";
