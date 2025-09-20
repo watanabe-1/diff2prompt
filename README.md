@@ -1,5 +1,7 @@
 # diff2prompt
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/watanabe-1/diff2prompt)
+
 Turn your local Git changes into a clean, copy-pastable prompt for ChatGPT (including a **commit message**, **PR title**, and **branch name** suggestion).
 
 > ✅ Works with staged & unstaged diffs, optionally includes new/untracked files (with binary/huge-file safeguards), prints a console preview, and writes the full prompt to a file.
