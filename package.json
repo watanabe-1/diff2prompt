@@ -33,7 +33,7 @@
     "lint": "eslint \"**/*.ts\"",
     "lint:fix": "eslint \"**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
-    "diff2prompt": "bun run src/index.ts"
+    "diff2prompt": "bun run src/index.ts --exclude=bun.lock --excludeFile=.gitignore"
   },
   "dependencies": {},
   "devDependencies": {
