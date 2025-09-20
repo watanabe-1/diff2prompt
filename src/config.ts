@@ -1,4 +1,3 @@
-// ===== src/config.ts =====
 import { exec as cpExec } from "child_process";
 import { readFile } from "fs/promises";
 import { join } from "path";

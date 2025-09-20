@@ -32,7 +32,7 @@ const fsState = vi.hoisted(() => ({
 }));
 
 // ---- child_process mock ----
-// 新ロジックは git コマンドが動的（pathspec 付き）なので、前方一致で振り分ける
+// New logic: git commands are dynamic (with pathspec), so dispatch by prefix match.
 vi.mock("child_process", () => {
   type ExecCb = (error: Error | null, stdout?: string, stderr?: string) => void;
 
@@ -102,7 +102,7 @@ vi.mock("child_process", () => {
     if (!list || excludes.length === 0) return list;
     const pats = excludes.map((p) => norm(p));
     const regexes = pats.map((p) => {
-      // heuristic: if ends with '/', do prefix; if contains * or ?, do glob; else substring/prefix-ish
+      // Heuristic: if it ends with '/', do a prefix match; if it contains * or ?, use a glob; otherwise treat as a simple prefix.
       if (p.endsWith("/")) {
         return { type: "prefix" as const, p };
       }
@@ -122,7 +122,7 @@ vi.mock("child_process", () => {
         for (const r of regexes) {
           if (r.type === "prefix") {
             if (np.startsWith(r.p)) return false;
-            // also allow directory boundary match: "dist" should drop "dist/a.js"
+            // Also allow directory-boundary match: "dist" should drop "dist/a.js"
             if (np === r.p.replace(/\/$/, "")) return false;
             if (np.startsWith(r.p.replace(/\/$/, "") + "/")) return false;
           } else {
@@ -662,8 +662,6 @@ describe("generate.ts flow", () => {
     expect(out.data).not.toContain("File: logs/app.log");
   });
 
-  // === NEW: coverage for readLinesIfExists(!txt), shellQuote, buildPathspec branches ===
-
   it("collectDiff(): excludeFile (relative) missing -> readLinesIfExists returns [] and no filtering (patterns.size===0)", async () => {
     // repo & git
     gitMap.setRoot("/repo\n");
@@ -672,18 +670,17 @@ describe("generate.ts flow", () => {
     // only one untracked file; should be kept because excludeFile is missing
     gitMap.setUntracked("keep.txt\n");
 
-    // NOTE: fsState.files に /repo/.missing.txt を置かない → readFile が throw
+    // NOTE: Do not add /repo/.missing.txt to fsState.files → readFile will throw.
     // readTextFileIfExists → null → readLinesIfExists(!txt) → []
-
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({
       ...defaultOptions,
       includeUntracked: true,
-      // 存在しない相対パス（repoRoot に対して解決）
+      // Non-existent relative path (resolved against repoRoot)
       excludeFile: ".missing.txt",
     });
 
-    // フィルタされずに残るはず
+    // It should remain unfiltered
     expect(s).toContain("File: keep.txt");
   });
 
@@ -693,7 +690,7 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked(["logs/a.log", "src/ok.txt"].join("\n"));
 
-    // 絶対パスの excludeFile。中身は 1 行 1 パターン
+    // Absolute-path excludeFile. Its content is one pattern per line.
     fsState.files.set("/abs/excludes.txt", {
       size: 16,
       buf: Buffer.from("logs\n", "utf8"),
@@ -705,12 +702,12 @@ describe("generate.ts flow", () => {
     const s = await collectDiff({
       ...defaultOptions,
       includeUntracked: true,
-      excludeFile: "/abs/excludes.txt", // isAbsolutePathLike(true) 分岐
+      excludeFile: "/abs/excludes.txt", // isAbsolutePathLike(true) branch
     });
 
     expect(s).toContain("File: src/ok.txt");
     expect(s).toContain("ok");
-    // logs/* は除外
+    // logs/* should be excluded
     expect(s).not.toContain("File: logs/a.log");
   });
 
@@ -727,7 +724,7 @@ describe("generate.ts flow", () => {
     const s = await collectDiff({
       ...defaultOptions,
       includeUntracked: true,
-      // スペースを含むパターン → buildPathspec -> shellQuote 実行を保証
+      // Pattern contains spaces → ensures buildPathspec triggers shellQuote
       exclude: ["build dir/"],
     });
 
