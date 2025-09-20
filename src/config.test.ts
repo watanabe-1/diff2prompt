@@ -16,6 +16,7 @@ vi.mock("fs/promises", () => {
       const key = norm(String(p));
       const v = mockFiles.get(key);
       if (v === null) return Promise.reject(new Error("ENOENT"));
+      if (v === undefined) return Promise.reject(new Error(`ENOENT: ${key}`));
 
       return Promise.resolve(v);
     }),
@@ -42,7 +43,7 @@ vi.mock("child_process", async () => {
   });
 
   function rawExec(
-    cmd: string,
+    _cmd: string,
     cb?: (err: unknown, stdout: string, stderr: string) => void
   ) {
     if (execState.throws) {
@@ -310,6 +311,52 @@ describe("normalizeUserConfig", () => {
       "C:/repo"
     );
     expect(cfg).toEqual({});
+  });
+
+  it("normalizes exclude array and excludeFile (relative -> absolute)", () => {
+    const cfg = normalizeUserConfig(
+      rec({
+        exclude: ["dist", "*.lock", "node_modules/"],
+        excludeFile: ".d2p-excludes",
+      }),
+      "C:/repo"
+    );
+    expect(cfg.exclude).toEqual(["dist", "*.lock", "node_modules/"]);
+    expect(cfg.excludeFile?.replace(/\\/g, "/")).toBe("C:/repo/.d2p-excludes");
+  });
+
+  it("accepts absolute excludeFile as-is", () => {
+    const cfg = normalizeUserConfig(
+      rec({
+        excludeFile: "C:/abs/ex.txt",
+      }),
+      "C:/repo"
+    );
+    expect(cfg.excludeFile?.replace(/\\/g, "/")).toBe("C:/abs/ex.txt");
+  });
+
+  it("loadUserConfig picks exclude fields from files", async () => {
+    putFile("C:/repo/diff2prompt.config.json", {
+      exclude: ["dist", "*.snap"],
+      excludeFile: ".git/ex.txt",
+    });
+    const cfg = await loadUserConfig("C:/repo");
+    expect(cfg.exclude).toEqual(["dist", "*.snap"]);
+    expect(cfg.excludeFile?.replace(/\\/g, "/")).toBe("C:/repo/.git/ex.txt");
+  });
+
+  it("env override also works for exclude fields", async () => {
+    putFile("C:/repo/diff2prompt.config.json", {
+      exclude: ["dist"],
+    });
+    process.env.DIFF2PROMPT_CONFIG = "C:/custom/cfg.json";
+    putFile("C:/custom/cfg.json", {
+      exclude: ["build"],
+      excludeFile: "C:/abs/custom.txt",
+    });
+    const cfg = await loadUserConfig("C:/repo");
+    expect(cfg.exclude).toEqual(["build"]);
+    expect(cfg.excludeFile?.replace(/\\/g, "/")).toBe("C:/abs/custom.txt");
   });
 });
 

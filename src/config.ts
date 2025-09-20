@@ -1,3 +1,4 @@
+// ===== src/config.ts =====
 import { exec as cpExec } from "child_process";
 import { readFile } from "fs/promises";
 import { join } from "path";
@@ -17,6 +18,10 @@ export type UserConfig = Partial<{
   promptTemplate?: string; // inline template text
   promptTemplateFile?: string; // absolute path to a template file
   templatePreset?: "default" | "minimal" | "ja" | string; // future-proof
+  /** Git pathspec-style excludes; array in config */
+  exclude?: string[];
+  /** File path that lists excludes (one per line) */
+  excludeFile?: string;
 }>;
 
 // Extract keys whose value types are assignable to V (e.g., string/number/boolean).
@@ -44,6 +49,12 @@ type NumberKeys<T, IncludeOptional extends boolean = true> = KeysByType<
 type BooleanKeys<T, IncludeOptional extends boolean = true> = KeysByType<
   T,
   boolean,
+  IncludeOptional
+>;
+
+type StringArrayKeys<T, IncludeOptional extends boolean = true> = KeysByType<
+  T,
+  string[],
   IncludeOptional
 >;
 
@@ -116,6 +127,21 @@ function pickBoolean(
   return typeof v === "boolean" ? v : undefined;
 }
 
+function pickStringArray(
+  obj: Record<string, unknown>,
+  key: StringArrayKeys<UserConfig>
+): string[] | undefined {
+  const v = obj[key as string];
+  if (
+    Array.isArray(v) &&
+    v.every((x) => typeof x === "string" && x.trim().length > 0)
+  ) {
+    return v as string[];
+  }
+
+  return undefined;
+}
+
 export function isAbsolutePath(p: string): boolean {
   // Windows drive, UNC, or POSIX absolute
   return /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith("\\\\") || p.startsWith("/");
@@ -131,6 +157,8 @@ export function normalizeUserConfig(
   const out: Partial<Options> = {};
   const outputPath = pickString(cfgRaw, "outputPath");
   const outputFile = pickString(cfgRaw, "outputFile");
+  const exclude = pickStringArray(cfgRaw, "exclude");
+  const excludeFile = pickString(cfgRaw, "excludeFile");
 
   let resolvedOutputPath: string | undefined;
 
@@ -168,6 +196,13 @@ export function normalizeUserConfig(
       : join(baseDir, promptTemplateFile);
   }
   if (typeof templatePreset === "string") out.templatePreset = templatePreset;
+
+  if (exclude && exclude.length) out.exclude = exclude;
+  if (excludeFile && excludeFile.trim()) {
+    out.excludeFile = isAbsolutePath(excludeFile)
+      ? excludeFile
+      : join(baseDir, excludeFile);
+  }
 
   return out;
 }
@@ -214,6 +249,7 @@ export function resolveDefaultOutputPath(
 
   return join(base, filename);
 }
+
 /** Merge Options in the order: defaults → file config → CLI. */
 export function mergeOptions(
   defaults: Options,
