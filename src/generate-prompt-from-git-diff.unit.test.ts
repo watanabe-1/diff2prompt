@@ -6,18 +6,24 @@ import {
   defaultOptions,
   Options,
   renderTemplate,
+  readTextFileIfExists,
 } from "../src/generate-prompt-from-git-diff";
 
 vi.mock("fs/promises", () => {
   return {
-    readFile: vi.fn(async (path: string, _?: string) => {
-      if (path === "ok.txt") return "HELLO TEMPLATE";
+    readFile: vi.fn(async (path: string, enc?: string) => {
+      if (path === "ok.txt")
+        return enc === "utf8"
+          ? "HELLO TEMPLATE"
+          : Buffer.from("HELLO TEMPLATE", "utf8");
+      if (path === "ex.txt")
+        return enc === "utf8"
+          ? ["dist", "*.lock"].join("\n")
+          : Buffer.from("dist\n*.lock\n", "utf8");
       throw new Error("fail");
     }),
   };
 });
-
-import { readTextFileIfExists } from "../src/generate-prompt-from-git-diff";
 
 describe("parseArgs", () => {
   it("parses flags correctly", () => {
@@ -54,6 +60,19 @@ describe("parseArgs", () => {
     expect(p.promptTemplate).toBe("INLINE {{diff}}");
     expect(p.promptTemplateFile).toBe("tpl.md");
     expect(p.templatePreset).toBe("minimal");
+  });
+
+  it("parses multiple --exclude and --exclude-file", () => {
+    const p = parseArgs([
+      "node",
+      "script",
+      "--exclude=dist",
+      "--exclude=node_modules/",
+      "--exclude=*.lock",
+      "--exclude-file=ex.txt",
+    ]);
+    expect(p.exclude).toEqual(["dist", "node_modules/", "*.lock"]);
+    expect(p.excludeFile).toBe("ex.txt");
   });
 });
 

@@ -4,6 +4,7 @@ Turn your local Git changes into a clean, copy-pastable prompt for ChatGPT (incl
 
 > ✅ Works with staged & unstaged diffs, optionally includes new/untracked files (with binary/huge-file safeguards), prints a console preview, and writes the full prompt to a file.
 > 🎨 Supports **custom prompt templates** (inline, file-based, or preset).
+> 🛡 Supports **exclude rules** to skip untracked files by glob-like patterns or list files.
 
 ---
 
@@ -23,16 +24,13 @@ pnpm diff2prompt
 By default, the tool:
 
 - Reads your current repo’s diffs (`git diff` & `git diff --cached`)
-
 - Optionally appends the contents of **untracked** files
-
 - Generates a structured prompt that asks ChatGPT to output:
   - **Commit message** (Conventional Commits)
   - **PR title** (mirrors the commit)
   - **Branch name** (scoped kebab-case)
 
 - Prints a **preview** (first N lines) to the console
-
 - Writes the **full prompt** to `generated-prompt.txt` at the repo root
 
 ---
@@ -41,7 +39,8 @@ By default, the tool:
 
 ```bash
 diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--max-buffer=BYTES] \
-            [--template=STRING] [--template-file=PATH] [--template-preset=NAME]
+            [--template=STRING] [--template-file=PATH] [--template-preset=NAME] \
+            [--exclude=GLOB] [--exclude-file=PATH]
 ```
 
 ### Flags
@@ -71,6 +70,20 @@ diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--
 - `--template-preset=NAME`
   Use a built-in preset (currently `default`, `minimal`, `ja`). Falls back to `default` if unknown.
 
+- `--exclude=GLOB`
+  Skip untracked files matching the given pattern. Supports multiple uses.
+  Example: `--exclude=dist --exclude="build dir"`
+
+- `--exclude-file=PATH`
+  Load exclude patterns (one per line, `#` for comments). Relative paths are resolved against the repo root.
+  Example file:
+
+  ```txt
+  dist
+  node_modules
+  *.log
+  ```
+
 ### Environment variables
 
 - `MAX_CONSOLE_LINES` — default preview lines (overridden by `--lines`)
@@ -99,79 +112,18 @@ You can set persistent defaults via any of the following (first match wins):
   "maxBuffer": 52428800,
   "promptTemplate": "Commit: {{diff}}",
   "promptTemplateFile": ".github/prompt.tpl.md",
-  "templatePreset": "minimal"
+  "templatePreset": "minimal",
+  "exclude": ["dist", "node_modules"],
+  "excludeFile": ".gitignore"
 }
 ```
 
 - `outputPath` takes precedence over `outputFile` if both are present.
 - `promptTemplate` (inline string) has the highest priority, then `promptTemplateFile`, then `templatePreset`, then built-in default.
 - Relative paths are resolved against the repo root.
-
----
-
-## Template system
-
-Templates are plain text with `{{placeholders}}`. Supported placeholders:
-
-- `{{diff}}` — the collected git diff + untracked files
-- `{{now}}` — ISO8601 timestamp at generation
-- `{{repoRoot}}` — repository root path (empty if unknown)
-
-### Example template file (`.github/prompt.tpl.md`)
-
-```md
-# Custom Prompt
-
-Time: {{now}}
-Repo: {{repoRoot}}
-
-Changes:
-{{diff}}
-
-Please output:
-
-- Commit message
-- PR title
-- Branch name
-```
-
----
-
-## What the default prompt looks like
-
-The built-in `default` template asks ChatGPT to produce **all three** items:
-
-```txt
-Commit message: <type>(<optional-scope>): <message>
-PR title: <type>(<optional-scope>): <message>
-Branch: <type>[/<scope>]/<short-kebab-slug>
-```
-
-It also includes guidance for Conventional Commits types, scope examples, and branch naming rules (lowercase `a–z0–9-`, `type/` prefix, optional `/scope`, length ≤ 40 after prefix).
-
----
-
-## Behavior details
-
-- **Diff collection**
-  Combines `git diff` and `git diff --cached`.
-
-- **Untracked files (optional)**
-  Enumerated via `git ls-files --others --exclude-standard`.
-  - **Binary files** are detected by the presence of a NUL byte and **skipped** with a note.
-  - **Large files** over `maxNewFileSizeBytes` are **skipped** with size info.
-
-- **Preview**
-  Prints a header and the first N lines (configurable).
-
-- **Output**
-  Full prompt is written to the configured `outputPath`. Default is `<repoRoot>/generated-prompt.txt`.
-
-- **Exit codes**
-  - `0` on success
-  - `1` with an error message, e.g.
-    - Not in a Git repo
-    - No changes found: neither diffs nor new files
+- `exclude` and `excludeFile` let you filter out noisy untracked files.
+  - Patterns can include spaces (`"build dir"`).
+  - Lines starting with `#` are treated as comments in `excludeFile`.
 
 ---
 
@@ -181,23 +133,17 @@ It also includes guidance for Conventional Commits types, scope examples, and br
 # Use a custom output file
 diff2prompt --out=.tmp/prompt.txt
 
-# Preview 30 lines
-diff2prompt --lines=30
-
 # Ignore untracked files
 diff2prompt --no-untracked
 
-# Allow very large diffs
-diff2prompt --max-buffer=104857600
+# Exclude common build artifacts
+diff2prompt --exclude=dist --exclude=node_modules
 
-# Use inline template
-diff2prompt --template="Repo: {{repoRoot}}\n\n{{diff}}"
+# Exclude with spaces
+diff2prompt --exclude="build dir"
 
-# Use template file
-diff2prompt --template-file=.github/prompt.tpl.md
-
-# Use minimal preset
-diff2prompt --template-preset=minimal
+# Exclude from a file (patterns resolved relative to repo root)
+diff2prompt --exclude-file=.gitignore
 ```
 
 ---
