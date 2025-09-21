@@ -2,11 +2,12 @@
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/watanabe-1/diff2prompt)
 
-Turn your local Git changes into a clean, copy-pastable prompt for **any AI assistant** (including a **commit message**, **PR title**, and **branch name** suggestion).
+Turn your local Git changes into a clean, copy-pastable prompt for **any AI assistant** (including a **commit message**, **PR title**, **branch name** suggestion, and optionally your **pull_request_template.md**). When a PR template is included, the output is designed to be pasted directly into your assistant’s canvas for convenient editing.
 
 > ✅ Works with staged & unstaged diffs, optionally includes new/untracked files (with binary/huge-file safeguards), prints a console preview, and writes the full prompt to a file.
 > 🎨 Supports **custom prompt templates** (inline, file-based, or preset).
 > 🛡 Supports **exclude rules** to skip untracked files by glob-like patterns or list files.
+> 📝 Can embed your repository’s **pull_request_template.md** directly into the generated prompt.
 
 ---
 
@@ -31,9 +32,10 @@ By default, the tool:
   - **Commit message** (Conventional Commits)
   - **PR title** (mirrors the commit)
   - **Branch name** (scoped kebab-case)
+  - **Pull request template content** (if configured)
 
 - Prints a **preview** (first N lines) to the console
-- Writes the **full prompt** to `generated-prompt.txt` at the repo root
+- Writes the **full prompt** to `generated-prompt.txt` (or `pull_request_template.md` if that mode is enabled) at the repo root
 
 ---
 
@@ -42,7 +44,7 @@ By default, the tool:
 ```bash
 diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--max-buffer=BYTES] \
             [--template=STRING] [--template-file=PATH] [--template-preset=NAME] \
-            [--exclude=GLOB] [--exclude-file=PATH]
+            [--exclude=GLOB] [--exclude-file=PATH] [--pr-template-file=PATH] [--include-pr-template]
 ```
 
 ### Flags
@@ -78,13 +80,12 @@ diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--
 
 - `--exclude-file=PATH`
   Load exclude patterns (one per line, `#` for comments). Relative paths are resolved against the repo root.
-  Example file:
 
-  ```txt
-  dist
-  node_modules
-  *.log
-  ```
+- `--include-pr-template`
+  Append the contents of the repository’s `pull_request_template.md` (or file specified with `--pr-template-file`).
+
+- `--pr-template-file=PATH`
+  Explicit path to a PR template file. Can be absolute or relative to the repo root.
 
 ### Environment variables
 
@@ -116,16 +117,18 @@ You can set persistent defaults via any of the following (first match wins):
   "promptTemplateFile": ".github/prompt.tpl.md",
   "templatePreset": "minimal",
   "exclude": ["dist", "node_modules"],
-  "excludeFile": ".gitignore"
+  "excludeFile": ".gitignore",
+  "includePrTemplate": true,
+  "prTemplateFile": ".github/pull_request_template.md"
 }
 ```
 
 - `outputPath` takes precedence over `outputFile` if both are present.
 - `promptTemplate` (inline string) has the highest priority, then `promptTemplateFile`, then `templatePreset`, then built-in default.
+- `includePrTemplate` tells diff2prompt to append the PR template’s contents into the generated prompt.
+- `prTemplateFile` specifies a custom path to the PR template.
 - Relative paths are resolved against the repo root.
 - `exclude` and `excludeFile` let you filter out noisy untracked files.
-  - Patterns can include spaces (`"build dir"`).
-  - Lines starting with `#` are treated as comments in `excludeFile`.
 
 ---
 
@@ -144,8 +147,14 @@ diff2prompt --exclude=dist --exclude=node_modules
 # Exclude with spaces
 diff2prompt --exclude="build dir"
 
-# Exclude from a file (patterns resolved relative to repo root)
+# Exclude from a file
 diff2prompt --exclude-file=.gitignore
+
+# Include the repository’s pull request template
+diff2prompt --include-pr-template
+
+# Use a custom PR template file
+diff2prompt --pr-template-file=.github/custom_pr_template.md
 ```
 
 ---
@@ -157,6 +166,9 @@ A: Stage or modify files first. The tool aggregates `git diff`, `git diff --cach
 
 **Q: Why are some files “binary content skipped”?**
 A: Binary detection avoids pasting unreadable data into the prompt (and blowing up your token count).
+
+**Q: Why does the prompt sometimes end with a PR template?**
+A: Because you enabled `includePrTemplate` (via config or `--include-pr-template`). This appends the `pull_request_template.md` content so you can paste everything into your AI assistant’s canvas at once.
 
 ---
 
