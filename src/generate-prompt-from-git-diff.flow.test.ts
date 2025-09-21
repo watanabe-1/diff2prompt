@@ -311,7 +311,7 @@ describe("generate.ts flow", () => {
     );
 
     const logs = logSpy.mock.calls.flat().join("\n");
-    expect(logs).toContain("--- Prompt for ChatGPT (preview) ---");
+    expect(logs).toContain("--- Prompt (preview) ---");
     expect(logs).toContain("... (truncated) ...");
     expect(logs).toContain("Prompt written to: OUT.txt");
   });
@@ -370,7 +370,7 @@ describe("generate.ts flow", () => {
       const prompt = ["line1", "line2"].join("\n");
       printPreview(prompt, /* maxLines*/ 5); // 2 <= 5 → non-truncation
       const logs = logSpy2.mock.calls.flat().join("\n");
-      expect(logs).toContain("--- Prompt for ChatGPT (preview) ---");
+      expect(logs).toContain("--- Prompt (preview) ---");
       expect(logs).toContain("line1");
       expect(logs).toContain("line2");
       expect(logs).not.toContain("... (truncated) ...");

@@ -1,5 +1,5 @@
 /** Header shown before previewing the generated prompt. */
-export const PREVIEW_HEADER = "\n--- Prompt for ChatGPT (preview) ---\n";
+export const PREVIEW_HEADER = "\n--- Prompt (preview) ---\n";
 
 /** Separator header before listing new/untracked files. */
 export const NEW_FILES_HEADER = "\n\n--- New files (contents) ---\n";
