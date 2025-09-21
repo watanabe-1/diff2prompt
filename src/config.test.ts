@@ -89,7 +89,7 @@ import {
   isAbsolutePath,
   getRepoRootSafe,
 } from "./config";
-import type { Options } from "./generate-prompt-from-git-diff";
+import { type Options } from "./generate-prompt-from-git-diff";
 
 const defaults: Options = {
   maxConsoleLines: 10,
@@ -413,6 +413,33 @@ describe("normalizeUserConfig (template fields)", () => {
     );
     expect(cfg.templatePreset).toBe("minimal");
   });
+
+  // --- NEW: includePrTemplate / prTemplateFile ---
+  it("captures includePrTemplate boolean", () => {
+    const cfg = normalizeUserConfig(
+      rec({ includePrTemplate: false }),
+      "C:/repo"
+    );
+    expect(cfg.includePrTemplate).toBe(false);
+  });
+
+  it("resolves relative prTemplateFile against baseDir", () => {
+    const cfg = normalizeUserConfig(
+      rec({ prTemplateFile: ".github/pull_request_template.md" }),
+      "C:/repo"
+    );
+    expect(cfg.prTemplateFile?.replace(/\\/g, "/")).toBe(
+      "C:/repo/.github/pull_request_template.md"
+    );
+  });
+
+  it("accepts absolute prTemplateFile as-is", () => {
+    const cfg = normalizeUserConfig(
+      rec({ prTemplateFile: "C:/abs/PR.md" }),
+      "C:/repo"
+    );
+    expect(cfg.prTemplateFile?.replace(/\\/g, "/")).toBe("C:/abs/PR.md");
+  });
 });
 
 describe("loadUserConfig (template fields precedence across sources)", () => {
@@ -434,5 +461,23 @@ describe("loadUserConfig (template fields precedence across sources)", () => {
     expect(cfg.promptTemplateFile?.endsWith("T.tpl.md")).toBe(true);
     expect(cfg.promptTemplate).toBeUndefined();
     expect(cfg.templatePreset).toBeUndefined();
+  });
+
+  // --- NEW: precedence for prTemplateFile / includePrTemplate ---
+  it("env config wins for prTemplateFile / includePrTemplate", async () => {
+    putFile("C:/repo/diff2prompt.config.json", {
+      prTemplateFile: "repo.md",
+      includePrTemplate: true,
+    });
+    process.env.DIFF2PROMPT_CONFIG = "C:/custom/cfg.json";
+    putFile("C:/custom/cfg.json", {
+      prTemplateFile: "C:/abs/customPR.md",
+      includePrTemplate: false,
+    });
+    const cfg = await loadUserConfig("C:/repo");
+    expect(cfg.prTemplateFile?.replace(/\\/g, "/")).toBe(
+      "C:/abs/customPR.md".replace(/\\/g, "/")
+    );
+    expect(cfg.includePrTemplate).toBe(false);
   });
 });

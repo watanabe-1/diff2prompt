@@ -74,6 +74,18 @@ describe("parseArgs", () => {
     expect(p.exclude).toEqual(["dist", "node_modules/", "*.lock"]);
     expect(p.excludeFile).toBe("ex.txt");
   });
+
+  // --- NEW ---
+  it("parses --no-pr-template and --pr-template-file", () => {
+    const p = parseArgs([
+      "node",
+      "script",
+      "--no-pr-template",
+      "--pr-template-file=.github/PR.md",
+    ]);
+    expect(p.includePrTemplate).toBe(false);
+    expect(p.prTemplateFile).toBe(".github/PR.md");
+  });
 });
 
 describe("looksBinary", () => {
@@ -87,7 +99,6 @@ describe("merge behavior (defaults -> file -> cli)", () => {
   it("uses default filename when neither file nor CLI set outputPath", () => {
     const repoRoot = "C:/repo";
     const merged = mergeOptions(defaultOptions, {}, {}, repoRoot, "C:/cwd");
-    // defaultOptions.outputPath is "", so should be resolved
     expect(merged.outputPath.endsWith("generated-prompt.txt")).toBe(true);
   });
 
@@ -143,7 +154,48 @@ describe("renderTemplate", () => {
   it("replaces existing keys and falls back to empty string for missing keys", () => {
     const tpl = "A={{a}}, B={{b}}, C={{c}}";
     const out = renderTemplate(tpl, { a: "X", c: "Z" });
-    // Since "b" doesn't exist, it should be replaced with an empty string.
     expect(out).toBe("A=X, B=, C=Z");
+  });
+
+  it("injects prTemplate when provided", () => {
+    const tpl = "HEAD\n{{prTemplate}}\nTAIL";
+    const out = renderTemplate(tpl, { prTemplate: "## PR\n- a\n- b" });
+    expect(out).toContain("## PR");
+    expect(out).toContain("- a");
+    expect(out).toContain("- b");
+  });
+});
+
+describe("loadPrTemplateText (absolute/relative path branches)", () => {
+  it("returns template text when prTemplateFile is an absolute path", async () => {
+    // モックされた fs の readFile を一時的にこのテスト用の戻り値にする
+    const fsmod = await import("fs/promises");
+    const readFileMock = fsmod.readFile as unknown as ReturnType<typeof vi.fn>;
+
+    // loadPrTemplateText 内では 1回だけ readFile('utf8') が呼ばれる想定
+    readFileMock.mockResolvedValueOnce("ABS TEMPLATE");
+
+    const mod = await import("../src/generate-prompt-from-git-diff");
+    const txt = await mod.loadPrTemplateText("C:/repo", {
+      prTemplateFile: "C:/abs/pull_request_template.md", // 絶対パス → isAbsolutePathLike === true 分岐
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    expect(txt).toBe("ABS TEMPLATE");
+  });
+
+  it("returns template text when prTemplateFile is a relative path (joined with repoRoot)", async () => {
+    const fsmod = await import("fs/promises");
+    const readFileMock = fsmod.readFile as unknown as ReturnType<typeof vi.fn>;
+
+    readFileMock.mockResolvedValueOnce("REL TEMPLATE");
+
+    const mod = await import("../src/generate-prompt-from-git-diff");
+    const txt = await mod.loadPrTemplateText("C:/repo", {
+      prTemplateFile: ".github/pull_request_template.md", // 相対パス → join(repoRoot, ...) 分岐
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    expect(txt).toBe("REL TEMPLATE");
   });
 });

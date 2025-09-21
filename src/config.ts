@@ -16,6 +16,8 @@ export type UserConfig = Partial<{
   maxBuffer: number;
   promptTemplate?: string; // inline template text
   promptTemplateFile?: string; // absolute path to a template file
+  includePrTemplate?: boolean;
+  prTemplateFile?: string; // absolute or repo-root relative
   templatePreset?: "default" | "minimal" | "ja" | string; // future-proof
   /** Git pathspec-style excludes; array in config */
   exclude?: string[];
@@ -179,6 +181,8 @@ export function normalizeUserConfig(
   const maxBuffer = pickNumber(cfgRaw, "maxBuffer");
   const promptTemplate = pickString(cfgRaw, "promptTemplate");
   const promptTemplateFile = pickString(cfgRaw, "promptTemplateFile");
+  const includePrTemplate = pickBoolean(cfgRaw, "includePrTemplate");
+  const prTemplateFile = pickString(cfgRaw, "prTemplateFile");
   const templatePreset = pickString(cfgRaw, "templatePreset");
 
   if (typeof maxConsoleLines === "number")
@@ -193,6 +197,13 @@ export function normalizeUserConfig(
     out.promptTemplateFile = isAbsolutePath(promptTemplateFile)
       ? promptTemplateFile
       : join(baseDir, promptTemplateFile);
+  }
+  if (typeof includePrTemplate === "boolean")
+    out.includePrTemplate = includePrTemplate;
+  if (typeof prTemplateFile === "string" && prTemplateFile.trim()) {
+    out.prTemplateFile = isAbsolutePath(prTemplateFile)
+      ? prTemplateFile
+      : join(baseDir, prTemplateFile);
   }
   if (typeof templatePreset === "string") out.templatePreset = templatePreset;
 

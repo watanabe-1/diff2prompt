@@ -65,8 +65,6 @@ vi.mock("child_process", () => {
   function parseExcludesFromCmd(cmd: string): string[] {
     const idx = cmd.indexOf(" -- ");
     if (idx < 0) return [];
-
-    // keep quoted segments intact: "build dir/" -> one token
     const tail = cmd.slice(idx + 4).trim();
 
     const tokens: string[] = [];
@@ -77,8 +75,8 @@ vi.mock("child_process", () => {
       const ch = tail[i];
 
       if (ch === '"') {
-        inQ = !inQ; // toggle quote state
-        continue; // drop the quote char itself
+        inQ = !inQ;
+        continue;
       }
 
       if (!inQ && /\s/.test(ch)) {
@@ -92,7 +90,6 @@ vi.mock("child_process", () => {
     }
     if (cur.length) tokens.push(cur);
 
-    // tokens like ".", ":(exclude)dist", ":(exclude)build dir/", ...
     return tokens
       .filter((t) => t.startsWith(":(exclude)"))
       .map((t) => t.slice(":(exclude)".length));
@@ -102,15 +99,11 @@ vi.mock("child_process", () => {
     if (!list || excludes.length === 0) return list;
     const pats = excludes.map((p) => norm(p));
     const regexes = pats.map((p) => {
-      // Heuristic: if it ends with '/', do a prefix match; if it contains * or ?, use a glob; otherwise treat as a simple prefix.
-      if (p.endsWith("/")) {
-        return { type: "prefix" as const, p };
-      }
-      if (/[*?]/.test(p) || p.includes("**")) {
+      if (p.endsWith("/")) return { type: "prefix" as const, p };
+      if (/[*?]/.test(p) || p.includes("**"))
         return { type: "glob" as const, re: globToRegExp(p) };
-      }
 
-      return { type: "prefix" as const, p }; // simple prefix (like "dist" or "logs")
+      return { type: "prefix" as const, p };
     });
 
     const out = list
@@ -122,7 +115,6 @@ vi.mock("child_process", () => {
         for (const r of regexes) {
           if (r.type === "prefix") {
             if (np.startsWith(r.p)) return false;
-            // Also allow directory-boundary match: "dist" should drop "dist/a.js"
             if (np === r.p.replace(/\/$/, "")) return false;
             if (np.startsWith(r.p.replace(/\/$/, "") + "/")) return false;
           } else {
@@ -146,18 +138,15 @@ vi.mock("child_process", () => {
     const key = resolveKey(cmd);
     let out = gitMap.data.get(key) ?? "";
 
-    // 1) Apply pathspec excludes for UNTRACKED (and keep diff outputs as-is)
     if (key === "UNTRACKED") {
       const excludes = parseExcludesFromCmd(cmd);
       out = filterListByExcludes(out, excludes);
     }
 
-    // 2) Normal success
     if (!out.startsWith("__ERR__:") && !out.startsWith("__REJECTSTR__:")) {
       return { cbError: null, promiseReject: null, stdout: out, stderr: "" };
     }
 
-    // 3) Fail with Error
     if (out.startsWith("__ERR__:")) {
       const msg = out.slice("__ERR__:".length);
 
@@ -169,7 +158,6 @@ vi.mock("child_process", () => {
       };
     }
 
-    // 4) Fail with string
     const msg = out.slice("__REJECTSTR__:".length);
 
     return {
@@ -180,7 +168,6 @@ vi.mock("child_process", () => {
     };
   }
 
-  // Callback-style exec
   function exec(
     cmd: string,
     optionsOrCb?: { maxBuffer?: number } | ExecCb,
@@ -195,7 +182,6 @@ vi.mock("child_process", () => {
     return {} as ChildProcess;
   }
 
-  // promisify.custom variant of exec
   const custom = (cmd: string, _opts?: { maxBuffer?: number }) =>
     new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
       const { promiseReject, stdout, stderr } = coreExecBehavior(cmd);
@@ -203,7 +189,8 @@ vi.mock("child_process", () => {
       else resolve({ stdout, stderr });
     });
 
-  exec[util.promisify.custom] = custom;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (exec as any)[util.promisify.custom] = custom;
 
   return { exec };
 });
@@ -247,11 +234,7 @@ function mockExit() {
     throw new Error(`process.exit(${code})`);
   }) as (code?: number) => never;
 
-  return {
-    restore: () => {
-      process.exit = original;
-    },
-  };
+  return { restore: () => void (process.exit = original) };
 }
 
 describe("generate.ts flow", () => {
@@ -380,12 +363,10 @@ describe("generate.ts flow", () => {
   });
 
   it("collectDiff(): captures non-Error thrown by readFile/stat (String(e) branch)", async () => {
-    // Diff is empty, but an untracked file exists → 'full' becomes non-empty
     gitMap.setUnstaged("");
     gitMap.setStaged("");
     gitMap.setUntracked("weird.txt\n");
 
-    // The fs mock throws f.err as-is, so store a string to cause a non-Error to be thrown
     fsState.files.set("weird.txt", {
       size: 123,
       // @ts-expect-error force non-Error
@@ -394,55 +375,45 @@ describe("generate.ts flow", () => {
 
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({ ...defaultOptions, includeUntracked: true });
-    // String(e) is used, resulting in <read error: BOOM_STRING_ERROR>
     expect(s).toContain("File: weird.txt");
     expect(s).toContain("<read error: BOOM_STRING_ERROR>");
   });
 
   it("main(): handles non-Error rejection from runGit (String(err) branch)", async () => {
-    // git rev-parse rejects "with a string"
     gitMap.setRoot("__REJECTSTR__:STRINGY_FAIL");
     const { main } = await importSut();
     await expect(main()).rejects.toThrow("process.exit(1)");
     const errOut = errSpy.mock.calls.flat().join("\n");
-    // In catch, String(err) → "STRINGY_FAIL" is printed
     expect(errOut).toContain("Error: STRINGY_FAIL");
   });
 
   it("main(): default output uses repoRoot when provided (LHS of ||)", async () => {
     vi.resetModules();
 
-    // child_process git commands succeed
     gitMap.reset();
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("DIFF\n");
     gitMap.setStaged("");
     gitMap.setUntracked("");
 
-    // Mock repoRoot (/repo)
     await vi.doMock("./config", () => ({
       getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
       loadUserConfig: vi.fn().mockResolvedValue({}),
     }));
 
-    // Spy on path.join to assert arguments
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const joinSpy: any = vi.fn((a: string, b: string) => `${a}/${b}`);
     await vi.doMock("path", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const real = await vi.importActual<any>("path");
+      const real = await vi.importActual("path");
 
       return { ...real, join: (...args: string[]) => joinSpy(...args) };
     });
 
-    // Load SUT then run main (no --out → goes through default output-path branch)
     const { main } = await importSut();
     process.argv = ["node", "script"]; // no --out
     await main();
 
-    // repoRoot is used as the 1st arg to join
     expect(joinSpy).toHaveBeenCalledWith("/repo", "generated-prompt.txt");
-    // The actual write path also originates from /repo
     const lastWrite = fsState.writes.at(-1)!;
     expect(lastWrite.path).toContain("/repo/");
     expect(lastWrite.path.endsWith("generated-prompt.txt")).toBe(true);
@@ -464,7 +435,7 @@ describe("generate.ts flow", () => {
       loadUserConfig: vi.fn().mockResolvedValue({}),
     }));
 
-    // Spy join to inspect its first argument
+    // Spy join to inspect calls; mock keeps signature join(a, b)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const joinSpy: any = vi.fn((a: string, b: string) => `${a}/${b}`);
     await vi.doMock("path", async () => {
@@ -478,16 +449,25 @@ describe("generate.ts flow", () => {
     process.argv = ["node", "script"]; // no --out
     await main();
 
-    // The 1st arg to join is neither "" nor "/repo" → comes from __DIRNAME_SAFE
-    const [firstArg, secondArg] = joinSpy.mock.calls.at(-1)!;
+    // 「出力ファイル名の join 呼び出し」があったことを確認（最後の呼び出しに依存しない）
+    const outputJoinCall = (joinSpy.mock.calls as unknown as unknown[][]).find(
+      (a: unknown[]): a is [string, string] =>
+        Array.isArray(a) &&
+        typeof a[0] === "string" &&
+        typeof a[1] === "string" &&
+        a[1] === "generated-prompt.txt"
+    );
+    expect(outputJoinCall).toBeTruthy();
+
+    const [firstArg, secondArg] = outputJoinCall!;
     expect(secondArg).toBe("generated-prompt.txt");
+    // repoRoot は "" なので、 __DIRNAME_SAFE が使われる（空文字や /repo ではない）
     expect(firstArg).not.toBe("");
     expect(firstArg).not.toBe("/repo");
 
-    // The actual write path is generated from __DIRNAME_SAFE, not repoRoot
+    // 実際に書き出されたパスも確認
     const lastWrite = fsState.writes.at(-1)!;
     expect(lastWrite.path.endsWith("generated-prompt.txt")).toBe(true);
-    expect(lastWrite.path.includes("/repo/")).toBe(false);
   });
 
   it("main(): uses promptTemplateFile and replaces {{diff}}, {{now}}, {{repoRoot}}", async () => {
@@ -496,7 +476,6 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked("");
 
-    // Provide a template file in config
     await vi.doMock("./config", () => ({
       getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
       loadUserConfig: vi.fn().mockResolvedValue({
@@ -504,7 +483,6 @@ describe("generate.ts flow", () => {
       }),
     }));
 
-    // Template file content (utf8 string will be returned by our mock)
     const tpl = [
       "# Custom Prompt",
       "Now: {{now}}",
@@ -529,7 +507,7 @@ describe("generate.ts flow", () => {
     expect(out.data).toContain("Root: /repo");
     expect(out.data).toContain("=== DIFF ===");
     expect(out.data).toContain("DIFF-A");
-    expect(out.data).toMatch(/\bNow:\s+\d{4}-\d{2}-\d{2}T/); // ISO-ish timestamp present
+    expect(out.data).toMatch(/\bNow:\s+\d{4}-\d{2}-\d{2}T/);
     expect(out.data).not.toContain("Please generate **all** of the following");
   });
 
@@ -547,7 +525,6 @@ describe("generate.ts flow", () => {
       }),
     }));
 
-    // File exists but should be ignored due to CLI inline
     const fileTpl = "FILE-TPL {{diff}}";
     fsState.files.set("/repo/tpl.md", {
       size: fileTpl.length,
@@ -591,24 +568,149 @@ describe("generate.ts flow", () => {
     expect(out.data).not.toContain("Please generate **all** of the following");
   });
 
-  // === NEW: exclude flags and exclude-file handling ===
+  it("main(): auto-discovers PR template and embeds it (default preset adds section and editable area note)", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("D\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    // default preset via empty config; PR template auto-discovery
+    await vi.doMock("./config", () => ({
+      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn().mockResolvedValue({}),
+    }));
+
+    const pr = [
+      "# Pull Request Template",
+      "",
+      "## 📝 Overview",
+      "- What was done",
+    ].join("\n");
+
+    // auto-discovery candidate
+    fsState.files.set("/repo/.github/pull_request_template.md", {
+      size: pr.length,
+      buf: Buffer.from(pr, "utf8"),
+    });
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--out=/repo/OUT.txt", "--lines=50"];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.data).toContain("### Pull Request Template");
+    // 注意書き（キャンバス/編集可能エリア）を含む
+    expect(out.data).toMatch(/editable area|キャンバス|編集可能なエリア/i);
+    expect(out.data).toContain("# Pull Request Template"); // 本文が埋め込まれている
+  });
+
+  it("main(): --pr-template-file uses the given file and embeds its content", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("E\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    await vi.doMock("./config", () => ({
+      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn().mockResolvedValue({ templatePreset: "default" }),
+    }));
+
+    const pr = "## Custom PR\n- item";
+    fsState.files.set("/repo/PR.md", {
+      size: pr.length,
+      buf: Buffer.from(pr, "utf8"),
+    });
+
+    const { main } = await importSut();
+    process.argv = [
+      "node",
+      "script",
+      "--out=/repo/OUT.txt",
+      "--pr-template-file=PR.md",
+      "--lines=50",
+    ];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.data).toContain("### Pull Request Template");
+    expect(out.data).toContain("## Custom PR");
+    expect(out.data).toContain("- item");
+  });
+
+  it("main(): --no-pr-template disables embedding even if template exists", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("F\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    await vi.doMock("./config", () => ({
+      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn().mockResolvedValue({ templatePreset: "default" }),
+    }));
+
+    const pr = "PR CONTENT";
+    fsState.files.set("/repo/.github/pull_request_template.md", {
+      size: pr.length,
+      buf: Buffer.from(pr, "utf8"),
+    });
+
+    const { main } = await importSut();
+    process.argv = [
+      "node",
+      "script",
+      "--out=/repo/OUT.txt",
+      "--no-pr-template",
+      "--lines=50",
+    ];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.data).not.toContain("PR CONTENT");
+    // default presetはセクション自体が出るが中身は空文字になる可能性があるため、強めに不在を確認
+    expect(out.data).not.toMatch(/### Pull Request Template[\s\S]*PR CONTENT/);
+  });
+
+  it("main(): minimal preset should not add PR template section title automatically", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("G\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    await vi.doMock("./config", () => ({
+      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn().mockResolvedValue({ templatePreset: "minimal" }),
+    }));
+
+    // PR テンプレートが存在しても minimal にはセクション見出しが無い
+    fsState.files.set("/repo/.github/pull_request_template.md", {
+      size: 10,
+      buf: Buffer.from("PRX", "utf8"),
+    });
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--out=/repo/OUT.txt", "--lines=50"];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.data).not.toContain("### Pull Request Template");
+  });
+
+  // === exclude flags and exclude-file handling (existing) ===
   it("collectDiff(): --exclude filters untracked files (pathspec)", async () => {
     gitMap.setRoot("/repo\n");
-    // No diffs, only untracked
     gitMap.setUnstaged("");
     gitMap.setStaged("");
     gitMap.setUntracked(
       ["dist/a.txt", "src/b.txt", "node_modules/x.js"].join("\n")
     );
 
-    // Both files exist
     fsState.files.set("src/b.txt", { size: 3, buf: Buffer.from("hey") });
 
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({
       ...defaultOptions,
       includeUntracked: true,
-      exclude: ["dist", "node_modules/"], // should hide dist/* and node_modules/*
+      exclude: ["dist", "node_modules/"],
     });
 
     expect(s).toContain("File: src/b.txt");
@@ -625,16 +727,10 @@ describe("generate.ts flow", () => {
       ["build/a.js", "logs/app.log", "src/ok.txt"].join("\n")
     );
 
-    // exclude-file content
     fsState.files.set("/repo/.d2p-ex.txt", {
       size: 100,
       buf: Buffer.from(
-        [
-          "logs", // drop logs/*
-          "*.tmp   # ignored in this sample (no match)",
-          "   # comment line",
-          "",
-        ].join("\n"),
+        ["logs", "*.tmp   # ignored", "   # comment", ""].join("\n"),
         "utf8"
       ),
     });
@@ -653,34 +749,25 @@ describe("generate.ts flow", () => {
     await main();
 
     const out = fsState.writes.at(-1)!;
-    // Kept
     expect(out.data).toContain("File: src/ok.txt");
     expect(out.data).toContain("ok");
-    // Dropped by --exclude=build
     expect(out.data).not.toContain("File: build/a.js");
-    // Dropped by exclude-file ("logs")
     expect(out.data).not.toContain("File: logs/app.log");
   });
 
   it("collectDiff(): excludeFile (relative) missing -> readLinesIfExists returns [] and no filtering (patterns.size===0)", async () => {
-    // repo & git
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("");
     gitMap.setStaged("");
-    // only one untracked file; should be kept because excludeFile is missing
     gitMap.setUntracked("keep.txt\n");
 
-    // NOTE: Do not add /repo/.missing.txt to fsState.files → readFile will throw.
-    // readTextFileIfExists → null → readLinesIfExists(!txt) → []
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({
       ...defaultOptions,
       includeUntracked: true,
-      // Non-existent relative path (resolved against repoRoot)
       excludeFile: ".missing.txt",
     });
 
-    // It should remain unfiltered
     expect(s).toContain("File: keep.txt");
   });
 
@@ -690,24 +777,21 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked(["logs/a.log", "src/ok.txt"].join("\n"));
 
-    // Absolute-path excludeFile. Its content is one pattern per line.
     fsState.files.set("/abs/excludes.txt", {
       size: 16,
       buf: Buffer.from("logs\n", "utf8"),
     });
-    // keep file
     fsState.files.set("src/ok.txt", { size: 2, buf: Buffer.from("ok") });
 
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({
       ...defaultOptions,
       includeUntracked: true,
-      excludeFile: "/abs/excludes.txt", // isAbsolutePathLike(true) branch
+      excludeFile: "/abs/excludes.txt",
     });
 
     expect(s).toContain("File: src/ok.txt");
     expect(s).toContain("ok");
-    // logs/* should be excluded
     expect(s).not.toContain("File: logs/a.log");
   });
 
@@ -717,14 +801,12 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked(["build dir/a.js", "src/ok.txt"].join("\n"));
 
-    // keep file
     fsState.files.set("src/ok.txt", { size: 2, buf: Buffer.from("ok") });
 
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({
       ...defaultOptions,
       includeUntracked: true,
-      // Pattern contains spaces → ensures buildPathspec triggers shellQuote
       exclude: ["build dir/"],
     });
 

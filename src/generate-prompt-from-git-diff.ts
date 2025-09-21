@@ -33,6 +33,8 @@ export interface Options {
   maxBuffer: number;
   promptTemplate?: string; // inline template text
   promptTemplateFile?: string; // absolute path to a template file
+  includePrTemplate?: boolean; // default true
+  prTemplateFile?: string; // absolute or repo-root relative
   templatePreset?: "default" | "minimal" | "ja" | string; // future-proof
   /** Git pathspec-style excludes; e.g. ["dist", "*.lock", "node_modules/"] */
   exclude?: string[];
@@ -47,6 +49,7 @@ export const defaultOptions: Options = {
   includeUntracked: true,
   maxNewFileSizeBytes: MAX_NEWFILE_SIZE_BYTES,
   maxBuffer: DEFAULT_MAX_BUFFER,
+  includePrTemplate: true,
 };
 
 export function parseArgs(argv: string[]): Partial<Options> {
@@ -65,6 +68,9 @@ export function parseArgs(argv: string[]): Partial<Options> {
       out.promptTemplateFile = a.split("=")[1]!;
     else if (a.startsWith("--template="))
       out.promptTemplate = a.slice("--template=".length);
+    else if (a === "--no-pr-template") out.includePrTemplate = false;
+    else if (a.startsWith("--pr-template-file="))
+      out.prTemplateFile = a.split("=")[1]!;
     else if (a.startsWith("--template-preset="))
       out.templatePreset = a.split("=")[1]!;
     else if (a.startsWith("--exclude=")) {
@@ -101,16 +107,6 @@ export async function readTextFileIfExists(
   } catch {
     return null;
   }
-}
-
-export function renderTemplate(
-  tpl: string,
-  data: Record<string, string>
-): string {
-  // Simple {{key}} replacement (raw substitution without escaping)
-  return tpl.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, k) => {
-    return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : "";
-  });
 }
 
 /** Read lines from a file, trim, drop comments (# ...) and blanks. */
@@ -229,6 +225,34 @@ export function printPreview(prompt: string, maxLines: number) {
   if (lines.length > maxLines) console.log(TRUNCATED_LINE);
 }
 
+export async function loadPrTemplateText(
+  repoRoot: string,
+  opt: Options
+): Promise<string | null> {
+  // 1) Explicit path if provided
+  if (opt.prTemplateFile) {
+    const p = isAbsolutePathLike(opt.prTemplateFile)
+      ? opt.prTemplateFile
+      : join(repoRoot, opt.prTemplateFile);
+    const txt = await readTextFileIfExists(p);
+    if (txt && txt.trim()) return txt;
+  }
+  // 2) Common defaults (first match wins)
+  const candidates = [
+    ".github/pull_request_template.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    "docs/pull_request_template.md",
+    "pull_request_template.md",
+  ].map((p) => join(repoRoot, p));
+
+  for (const p of candidates) {
+    const txt = await readTextFileIfExists(p);
+    if (txt && txt.trim()) return txt;
+  }
+
+  return null;
+}
+
 export async function main() {
   const repoRoot = (await getRepoRootSafe()) ?? process.cwd();
   const fileCfg = await loadUserConfig(repoRoot);
@@ -275,10 +299,17 @@ export async function main() {
     }
 
     const nowIso = new Date().toISOString();
+    let prTemplateText = "";
+    if (merged.includePrTemplate) {
+      const found = await loadPrTemplateText(repoRoot, merged);
+      if (found) prTemplateText = found.trim();
+    }
+
     const prompt = renderTemplate(templateText, {
       diff: patchContent,
       now: nowIso,
       repoRoot: repoRoot,
+      prTemplate: prTemplateText,
     });
 
     printPreview(prompt, merged.maxConsoleLines);
@@ -289,4 +320,14 @@ export async function main() {
     console.error(`Error: ${msg}`);
     process.exit(1);
   }
+}
+
+export function renderTemplate(
+  tpl: string,
+  data: Record<string, string>
+): string {
+  // Simple {{key}} replacement (raw substitution without escaping)
+  return tpl.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, k) => {
+    return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : "";
+  });
 }
