@@ -449,7 +449,8 @@ describe("generate.ts flow", () => {
     process.argv = ["node", "script"]; // no --out
     await main();
 
-    // 「出力ファイル名の join 呼び出し」があったことを確認（最後の呼び出しに依存しない）
+    // Confirm that there was a "join call for the output file name"
+    // (does not rely on the last call)
     const outputJoinCall = (joinSpy.mock.calls as unknown as unknown[][]).find(
       (a: unknown[]): a is [string, string] =>
         Array.isArray(a) &&
@@ -461,12 +462,14 @@ describe("generate.ts flow", () => {
 
     const [firstArg, secondArg] = outputJoinCall!;
     expect(secondArg).toBe("generated-prompt.txt");
-    // repoRoot は "" なので、 __DIRNAME_SAFE が使われる（空文字や /repo ではない）
+    // Since repoRoot is "", __DIRNAME_SAFE should be used
+    // (not an empty string or /repo)
     expect(firstArg).not.toBe("");
     expect(firstArg).not.toBe("/repo");
 
-    // 実際に書き出されたパスも確認
+    // Also check the actually written path
     const lastWrite = fsState.writes.at(-1)!;
+
     expect(lastWrite.path.endsWith("generated-prompt.txt")).toBe(true);
   });
 
@@ -599,9 +602,9 @@ describe("generate.ts flow", () => {
 
     const out = fsState.writes.at(-1)!;
     expect(out.data).toContain("### Pull Request Template");
-    // 注意書き（キャンバス/編集可能エリア）を含む
+    // Includes the note (canvas/editable area)
     expect(out.data).toMatch(/editable area|キャンバス|編集可能なエリア/i);
-    expect(out.data).toContain("# Pull Request Template"); // 本文が埋め込まれている
+    expect(out.data).toContain("# Pull Request Template"); // The body is embedded
   });
 
   it("main(): --pr-template-file uses the given file and embeds its content", async () => {
@@ -666,7 +669,8 @@ describe("generate.ts flow", () => {
 
     const out = fsState.writes.at(-1)!;
     expect(out.data).not.toContain("PR CONTENT");
-    // default presetはセクション自体が出るが中身は空文字になる可能性があるため、強めに不在を確認
+    // Since the default preset may output the section itself but leave its contents empty,
+    // strongly assert that the content is absent
     expect(out.data).not.toMatch(/### Pull Request Template[\s\S]*PR CONTENT/);
   });
 
@@ -681,7 +685,7 @@ describe("generate.ts flow", () => {
       loadUserConfig: vi.fn().mockResolvedValue({ templatePreset: "minimal" }),
     }));
 
-    // PR テンプレートが存在しても minimal にはセクション見出しが無い
+    // Even if a PR template exists, the minimal preset does not include a section heading
     fsState.files.set("/repo/.github/pull_request_template.md", {
       size: 10,
       buf: Buffer.from("PRX", "utf8"),

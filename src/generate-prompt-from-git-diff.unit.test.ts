@@ -168,16 +168,16 @@ describe("renderTemplate", () => {
 
 describe("loadPrTemplateText (absolute/relative path branches)", () => {
   it("returns template text when prTemplateFile is an absolute path", async () => {
-    // モックされた fs の readFile を一時的にこのテスト用の戻り値にする
+    // Temporarily set the mocked fs.readFile to return this test value
     const fsmod = await import("fs/promises");
     const readFileMock = fsmod.readFile as unknown as ReturnType<typeof vi.fn>;
 
-    // loadPrTemplateText 内では 1回だけ readFile('utf8') が呼ばれる想定
+    // In loadPrTemplateText, readFile('utf8') is expected to be called exactly once
     readFileMock.mockResolvedValueOnce("ABS TEMPLATE");
 
     const mod = await import("../src/generate-prompt-from-git-diff");
     const txt = await mod.loadPrTemplateText("C:/repo", {
-      prTemplateFile: "C:/abs/pull_request_template.md", // 絶対パス → isAbsolutePathLike === true 分岐
+      prTemplateFile: "C:/abs/pull_request_template.md", // Absolute path → branch where isAbsolutePathLike === true
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
@@ -192,7 +192,7 @@ describe("loadPrTemplateText (absolute/relative path branches)", () => {
 
     const mod = await import("../src/generate-prompt-from-git-diff");
     const txt = await mod.loadPrTemplateText("C:/repo", {
-      prTemplateFile: ".github/pull_request_template.md", // 相対パス → join(repoRoot, ...) 分岐
+      prTemplateFile: ".github/pull_request_template.md", // Relative path → branch that uses join(repoRoot, ...)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 

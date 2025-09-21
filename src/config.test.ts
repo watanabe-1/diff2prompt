@@ -414,7 +414,6 @@ describe("normalizeUserConfig (template fields)", () => {
     expect(cfg.templatePreset).toBe("minimal");
   });
 
-  // --- NEW: includePrTemplate / prTemplateFile ---
   it("captures includePrTemplate boolean", () => {
     const cfg = normalizeUserConfig(
       rec({ includePrTemplate: false }),
@@ -463,7 +462,6 @@ describe("loadUserConfig (template fields precedence across sources)", () => {
     expect(cfg.templatePreset).toBeUndefined();
   });
 
-  // --- NEW: precedence for prTemplateFile / includePrTemplate ---
   it("env config wins for prTemplateFile / includePrTemplate", async () => {
     putFile("C:/repo/diff2prompt.config.json", {
       prTemplateFile: "repo.md",
