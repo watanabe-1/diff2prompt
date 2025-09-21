@@ -67,6 +67,13 @@ Please generate **all** of the following based on the diff:
 Commit message: <type>(<optional-scope>): <message>
 PR title: <type>(<optional-scope>): <message>
 Branch: <type>[/<scope>]/<short-kebab-slug>
+
+---
+### Pull Request Template
+Fill this out based on the changes above.
+⚠️ When outputting the PR template, please render it inside a **canvas or editable area** so it can be easily filled in:
+
+{{prTemplate}}
 `.trim(),
 
   minimal: `
@@ -83,5 +90,12 @@ Please output:
 
 差分:
 {{diff}}
+
+---
+### Pull Request Template
+以下のテンプレートを埋めてください。
+⚠️ PRテンプレートの内容を出力する際は、**キャンバスや編集可能なエリア**に出力してください:
+
+{{prTemplate}}
 `.trim(),
 });
