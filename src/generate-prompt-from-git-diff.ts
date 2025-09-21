@@ -15,7 +15,6 @@ import {
   TRUNCATED_LINE,
   DEFAULT_OUTPUT_FILENAME,
 } from "./constants";
-import { GIT_CMD_ROOT } from "./git-constants";
 import { tooLargeSkipped, binarySkipped, readError } from "./strings";
 
 const exec = promisify(cpExec);
@@ -250,7 +249,7 @@ export async function main() {
 
   try {
     // Validate git repo (leave constant in use)
-    await runGit(GIT_CMD_ROOT, merged);
+    await runGit("git rev-parse --show-toplevel", merged);
 
     const patchContent = await collectDiff(merged);
 
