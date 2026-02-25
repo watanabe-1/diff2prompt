@@ -28,7 +28,7 @@ jobs:
             bun install
           fi
 
-      - name: Print versions
+      - name: Print version
         run: |
           bun -v
 
@@ -55,6 +55,10 @@ jobs:
           else
             bun install
           fi
+
+      - name: Print version
+        run: |
+          bun -v
 
       - name: Test
         run: bun run test
