@@ -56,5 +56,10 @@ jobs:
             bun install
           fi
 
+      - name: Print versions
+        run: |
+          bun -v
+          bunx next --version
+
       - name: Test
         run: bun run test
