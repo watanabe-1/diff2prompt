@@ -62,6 +62,10 @@ jobs:
             --fail-on-no-commits \
             --generate-notes
 
+      # Trusted Publishing requires recent npm (OIDC support).
+      - name: Upgrade npm
+        run: npm i -g npm@latest
+
       - name: Publish to npm
         run: npm publish
 
