@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/watanabe-1/diff2prompt"
+    "url": "git+https://github.com/watanabe-1/diff2prompt.git"
   },
   "homepage": "https://github.com/watanabe-1/diff2prompt#readme",
   "bugs": {
