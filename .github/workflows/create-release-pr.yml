@@ -32,7 +32,7 @@ jobs:
             echo "Invalid tag format: $TAG_REF"
             exit 1
           fi
-          tag_commit=$(git rev-list -n 1 -- "$TAG_REF")
+          tag_commit=$(git rev-list -n 1 "$TAG_REF")
           main_commit=$(git rev-parse origin/main)
           base_commit=$(git merge-base $tag_commit $main_commit)
           if [ "$base_commit" != "$tag_commit" ]; then
