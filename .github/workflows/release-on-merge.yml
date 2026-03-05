@@ -17,7 +17,7 @@ jobs:
     if: github.event.pull_request.merged == true && startsWith(github.head_ref, 'release/v') && github.event.pull_request.user.login == 'github-actions[bot]'
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.get_version.outputs.version }}
+      version: ${{ steps.validate_version.outputs.version }}
       release_sha: ${{ github.sha }}
 
     steps:
@@ -52,12 +52,24 @@ jobs:
         id: get_version
         run: echo "version=$(bun -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
+      - name: Validate version
+        id: validate_version
+        env:
+          PACKAGE_VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          if [[ "$PACKAGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "Invalid package version: $PACKAGE_VERSION"
+            exit 1
+          fi
+
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v${{ steps.get_version.outputs.version }}" \
-            --title "Release v${{ steps.get_version.outputs.version }}" \
+          gh release create "v${{ steps.validate_version.outputs.version }}" \
+            --title "Release v${{ steps.validate_version.outputs.version }}" \
             --verify-tag \
             --fail-on-no-commits \
             --generate-notes
