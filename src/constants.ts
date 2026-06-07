@@ -11,8 +11,7 @@ export const TRUNCATED_LINE = "... (truncated) ...";
 export const FILE_LABEL = "File: ";
 
 /** Error message when neither diff nor new files are found. */
-export const ERROR_NO_CHANGES =
-  "No changes found: neither diffs nor new files.";
+export const ERROR_NO_CHANGES = "No changes found: neither diffs nor new files.";
 
 /** Default filename for generated prompt output */
 export const DEFAULT_OUTPUT_FILENAME = "generated-prompt.txt";

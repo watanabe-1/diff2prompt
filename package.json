@@ -1,28 +1,28 @@
 {
   "name": "diff2prompt",
   "version": "0.0.10",
-  "author": "watanabe-1",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/watanabe-1/diff2prompt.git"
-  },
+  "keywords": [
+    "cli",
+    "typescript"
+  ],
   "homepage": "https://github.com/watanabe-1/diff2prompt#readme",
   "bugs": {
     "url": "https://github.com/watanabe-1/diff2prompt/issues"
   },
-  "keywords": [
-    "typescript",
-    "cli"
-  ],
-  "module": "dist/index.js",
-  "type": "module",
-  "files": [
-    "dist"
-  ],
+  "license": "MIT",
+  "author": "watanabe-1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/watanabe-1/diff2prompt.git"
+  },
   "bin": {
     "diff2prompt": "dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "module": "dist/index.js",
   "scripts": {
     "build": "bun run clean && bun build.ts",
     "clean": "bun -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
@@ -30,29 +30,24 @@
     "test:coverage": "vitest run --coverage.enabled true",
     "test:ui": "vitest --ui --coverage.enabled true",
     "test:watch": "vitest --watch",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
+    "lint": "bun run format:oxfmt:check && oxlint .",
+    "lint:oxlint": "oxlint .",
+    "check:fix": "oxfmt . && oxlint --fix .",
+    "format:oxfmt": "oxfmt .",
+    "format:oxfmt:check": "oxfmt --check .",
     "typecheck": "tsc --noEmit",
     "diff2prompt": "bun run src/index.ts --exclude=bun.lock --excludeFile=.gitignore"
   },
   "dependencies": {},
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@typescript-eslint/eslint-plugin": "^8.58.2",
-    "@typescript-eslint/parser": "^8.58.2",
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",
-    "@vitest/eslint-plugin": "^1.6.15",
     "@vitest/ui": "^4.1.4",
     "esbuild": "^0.28.0",
-    "eslint": "^10.2.0",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-unused-imports": "^4.4.1",
     "fast-glob": "^3.3.3",
-    "prettier": "^3.8.2",
+    "oxfmt": "^0.52.0",
+    "oxlint": "^1.67.0",
     "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.2",
     "vitest": "^4.1.4"
   },
   "peerDependencies": {

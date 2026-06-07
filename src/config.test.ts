@@ -12,7 +12,7 @@ const norm = (p: string) => p.replace(/\\/g, "/");
 
 vi.mock("fs/promises", () => {
   return {
-    readFile: vi.fn((p: string) => {
+    readFile: vi.fn<(p: string) => Promise<string>>((p: string) => {
       const key = norm(String(p));
       const v = mockFiles.get(key);
       if (v === null) return Promise.reject(new Error("ENOENT"));
@@ -20,12 +20,11 @@ vi.mock("fs/promises", () => {
 
       return Promise.resolve(v);
     }),
-    writeFile: vi.fn(),
-    stat: vi.fn(),
+    writeFile: vi.fn<() => void>(),
+    stat: vi.fn<() => void>(),
   };
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const execState = ((globalThis as any).__execState__ ??= {
   stdout: "C:/repo\n",
   throws: false,
@@ -35,17 +34,13 @@ vi.mock("child_process", async () => {
   const { promisify } = await import("util");
 
   // Extend the existing execState (add the 'shape' discriminator)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const execState = ((globalThis as any).__execState__ ??= {
     stdout: "C:/repo\n",
     throws: false,
     shape: "string" as "string" | "array" | "object",
   });
 
-  function rawExec(
-    _cmd: string,
-    cb?: (err: unknown, stdout: string, stderr: string) => void
-  ) {
+  function rawExec(_cmd: string, cb?: (err: unknown, stdout: string, stderr: string) => void) {
     if (execState.throws) {
       const err = new Error("fail");
       cb?.(err, "", "");
@@ -58,7 +53,6 @@ vi.mock("child_process", async () => {
   }
 
   // Key point: switch the return "shape" via promisify.custom
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (rawExec as any)[promisify.custom] = (_: string) => {
     if (execState.throws) {
       return Promise.reject(new Error("fail"));
@@ -120,16 +114,12 @@ describe("config loader & merge", () => {
 
   it("normalizes outputPath relative to baseDir", () => {
     const cfg = normalizeUserConfig({ outputPath: "out/p.txt" }, "C:/repo");
-    expect(cfg.outputPath?.replace(/\\/g, "/")).toBe(
-      "C:/repo/out/p.txt".replace(/\\/g, "/")
-    );
+    expect(cfg.outputPath?.replace(/\\/g, "/")).toBe("C:/repo/out/p.txt".replace(/\\/g, "/"));
   });
 
   it("falls back to outputFile when outputPath is absent", () => {
     const cfg = normalizeUserConfig({ outputFile: "p.md" }, "C:/repo");
-    expect(cfg.outputPath?.replace(/\\/g, "/")).toBe(
-      "C:/repo/p.md".replace(/\\/g, "/")
-    );
+    expect(cfg.outputPath?.replace(/\\/g, "/")).toBe("C:/repo/p.md".replace(/\\/g, "/"));
   });
 
   it("accepts absolute paths as-is", () => {
@@ -172,27 +162,15 @@ describe("config loader & merge", () => {
   it("mergeOptions: CLI overrides file config", () => {
     const fileCfg = normalizeUserConfig({ outputFile: "file.txt" }, "C:/repo");
     const cli: Partial<Options> = { outputPath: "C:/cli/over.txt" };
-    const merged = mergeOptions(
-      defaults,
-      fileCfg,
-      cli,
-      "C:/repo",
-      "C:/fallback"
-    );
-    expect(merged.outputPath.replace(/\\/g, "/")).toBe(
-      "C:/cli/over.txt".replace(/\\/g, "/")
-    );
+    const merged = mergeOptions(defaults, fileCfg, cli, "C:/repo", "C:/fallback");
+    expect(merged.outputPath.replace(/\\/g, "/")).toBe("C:/cli/over.txt".replace(/\\/g, "/"));
   });
 
   it("resolveDefaultOutputPath: uses repoRoot when available, else fallback", () => {
     const p1 = resolveDefaultOutputPath("C:/repo", "C:/cwd");
-    expect(p1.replace(/\\/g, "/")).toBe(
-      "C:/repo/generated-prompt.txt".replace(/\\/g, "/")
-    );
+    expect(p1.replace(/\\/g, "/")).toBe("C:/repo/generated-prompt.txt".replace(/\\/g, "/"));
     const p2 = resolveDefaultOutputPath(null, "C:/cwd");
-    expect(p2.replace(/\\/g, "/")).toBe(
-      "C:/cwd/generated-prompt.txt".replace(/\\/g, "/")
-    );
+    expect(p2.replace(/\\/g, "/")).toBe("C:/cwd/generated-prompt.txt".replace(/\\/g, "/"));
   });
 });
 
@@ -264,10 +242,7 @@ describe("normalizeUserConfig", () => {
   });
 
   it("resolves absolute outputPath", () => {
-    const cfg = normalizeUserConfig(
-      rec({ outputPath: "C:/abs/out.txt" }),
-      "C:/repo"
-    );
+    const cfg = normalizeUserConfig(rec({ outputPath: "C:/abs/out.txt" }), "C:/repo");
     expect(cfg.outputPath?.replace(/\\/g, "/")).toBe("C:/abs/out.txt");
   });
 
@@ -277,10 +252,7 @@ describe("normalizeUserConfig", () => {
   });
 
   it("resolves absolute outputFile", () => {
-    const cfg = normalizeUserConfig(
-      rec({ outputFile: "C:/abs/file.md" }),
-      "C:/repo"
-    );
+    const cfg = normalizeUserConfig(rec({ outputFile: "C:/abs/file.md" }), "C:/repo");
     expect(cfg.outputPath?.replace(/\\/g, "/")).toBe("C:/abs/file.md");
   });
 
@@ -292,7 +264,7 @@ describe("normalizeUserConfig", () => {
         maxNewFileSizeBytes: 123,
         maxBuffer: 456,
       }),
-      "C:/repo"
+      "C:/repo",
     );
     expect(cfg.maxConsoleLines).toBe(20);
     expect(cfg.includeUntracked).toBe(false);
@@ -308,7 +280,7 @@ describe("normalizeUserConfig", () => {
         maxNewFileSizeBytes: "big",
         maxBuffer: "xx",
       }),
-      "C:/repo"
+      "C:/repo",
     );
     expect(cfg).toEqual({});
   });
@@ -319,7 +291,7 @@ describe("normalizeUserConfig", () => {
         exclude: ["dist", "*.lock", "node_modules/"],
         excludeFile: ".d2p-excludes",
       }),
-      "C:/repo"
+      "C:/repo",
     );
     expect(cfg.exclude).toEqual(["dist", "*.lock", "node_modules/"]);
     expect(cfg.excludeFile?.replace(/\\/g, "/")).toBe("C:/repo/.d2p-excludes");
@@ -330,7 +302,7 @@ describe("normalizeUserConfig", () => {
       rec({
         excludeFile: "C:/abs/ex.txt",
       }),
-      "C:/repo"
+      "C:/repo",
     );
     expect(cfg.excludeFile?.replace(/\\/g, "/")).toBe("C:/abs/ex.txt");
   });
@@ -378,65 +350,43 @@ describe("isAbsolutePath", () => {
 
 describe("normalizeUserConfig (template fields)", () => {
   it("keeps inline promptTemplate as-is", () => {
-    const cfg = normalizeUserConfig(
-      rec({ promptTemplate: "Hello {{diff}}" }),
-      "C:/repo"
-    );
+    const cfg = normalizeUserConfig(rec({ promptTemplate: "Hello {{diff}}" }), "C:/repo");
     expect(cfg.promptTemplate).toBe("Hello {{diff}}");
   });
 
   it("resolves relative promptTemplateFile against baseDir", () => {
-    const cfg = normalizeUserConfig(
-      rec({ promptTemplateFile: ".github/tpl.md" }),
-      "C:/repo"
-    );
-    expect(cfg.promptTemplateFile?.replace(/\\/g, "/")).toBe(
-      "C:/repo/.github/tpl.md"
-    );
+    const cfg = normalizeUserConfig(rec({ promptTemplateFile: ".github/tpl.md" }), "C:/repo");
+    expect(cfg.promptTemplateFile?.replace(/\\/g, "/")).toBe("C:/repo/.github/tpl.md");
   });
 
   it("accepts absolute promptTemplateFile as-is", () => {
     const abs = "C:/abs/tpl.md";
-    const cfg = normalizeUserConfig(
-      rec({ promptTemplateFile: abs }),
-      "C:/repo"
-    );
-    expect(cfg.promptTemplateFile?.replace(/\\/g, "/")).toBe(
-      abs.replace(/\\/g, "/")
-    );
+    const cfg = normalizeUserConfig(rec({ promptTemplateFile: abs }), "C:/repo");
+    expect(cfg.promptTemplateFile?.replace(/\\/g, "/")).toBe(abs.replace(/\\/g, "/"));
   });
 
   it("captures templatePreset string", () => {
-    const cfg = normalizeUserConfig(
-      rec({ templatePreset: "minimal" }),
-      "C:/repo"
-    );
+    const cfg = normalizeUserConfig(rec({ templatePreset: "minimal" }), "C:/repo");
     expect(cfg.templatePreset).toBe("minimal");
   });
 
   it("captures includePrTemplate boolean", () => {
-    const cfg = normalizeUserConfig(
-      rec({ includePrTemplate: false }),
-      "C:/repo"
-    );
+    const cfg = normalizeUserConfig(rec({ includePrTemplate: false }), "C:/repo");
     expect(cfg.includePrTemplate).toBe(false);
   });
 
   it("resolves relative prTemplateFile against baseDir", () => {
     const cfg = normalizeUserConfig(
       rec({ prTemplateFile: ".github/pull_request_template.md" }),
-      "C:/repo"
+      "C:/repo",
     );
     expect(cfg.prTemplateFile?.replace(/\\/g, "/")).toBe(
-      "C:/repo/.github/pull_request_template.md"
+      "C:/repo/.github/pull_request_template.md",
     );
   });
 
   it("accepts absolute prTemplateFile as-is", () => {
-    const cfg = normalizeUserConfig(
-      rec({ prTemplateFile: "C:/abs/PR.md" }),
-      "C:/repo"
-    );
+    const cfg = normalizeUserConfig(rec({ prTemplateFile: "C:/abs/PR.md" }), "C:/repo");
     expect(cfg.prTemplateFile?.replace(/\\/g, "/")).toBe("C:/abs/PR.md");
   });
 });
@@ -473,9 +423,7 @@ describe("loadUserConfig (template fields precedence across sources)", () => {
       includePrTemplate: false,
     });
     const cfg = await loadUserConfig("C:/repo");
-    expect(cfg.prTemplateFile?.replace(/\\/g, "/")).toBe(
-      "C:/abs/customPR.md".replace(/\\/g, "/")
-    );
+    expect(cfg.prTemplateFile?.replace(/\\/g, "/")).toBe("C:/abs/customPR.md".replace(/\\/g, "/"));
     expect(cfg.includePrTemplate).toBe(false);
   });
 });

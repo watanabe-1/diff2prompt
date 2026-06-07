@@ -1,6 +1,7 @@
 import { build } from "esbuild";
 import type { BuildOptions } from "esbuild";
 import glob from "fast-glob";
+
 import pkg from "./package.json";
 
 const baseOptions: BuildOptions = {
@@ -13,10 +14,7 @@ const baseOptions: BuildOptions = {
 };
 
 const entriesForCli = await glob(["src/index.ts"]);
-const externals = [
-  ...Object.keys(pkg.dependencies),
-  ...Object.keys(pkg.peerDependencies),
-];
+const externals = [...Object.keys(pkg.dependencies), ...Object.keys(pkg.peerDependencies)];
 await build({
   ...baseOptions,
   entryPoints: entriesForCli,
@@ -28,11 +26,7 @@ await build({
   },
 });
 
-const entriesForNext = await glob([
-  "!src/**/types.ts",
-  "!src/**/*-types.ts",
-  "!src/**/*.test.ts",
-]);
+const entriesForNext = await glob(["!src/**/types.ts", "!src/**/*-types.ts", "!src/**/*.test.ts"]);
 await build({
   ...baseOptions,
   entryPoints: entriesForNext,

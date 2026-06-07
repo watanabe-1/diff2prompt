@@ -1,6 +1,6 @@
+import type { ChildProcess } from "child_process";
 import * as util from "node:util";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { ChildProcess } from "child_process";
 
 // === shared state for mocks (hoisted) ===
 const gitMap = vi.hoisted(() => ({
@@ -36,14 +36,11 @@ const fsState = vi.hoisted(() => ({
 vi.mock("child_process", () => {
   type ExecCb = (error: Error | null, stdout?: string, stderr?: string) => void;
 
-  function resolveKey(
-    cmd: string
-  ): "ROOT" | "UNSTAGED" | "STAGED" | "UNTRACKED" | string {
+  function resolveKey(cmd: string): "ROOT" | "UNSTAGED" | "STAGED" | "UNTRACKED" | string {
     if (cmd.startsWith("git rev-parse --show-toplevel")) return "ROOT";
     if (cmd.startsWith("git diff --cached -- ")) return "STAGED";
     if (cmd.startsWith("git diff -- ")) return "UNSTAGED";
-    if (cmd.startsWith("git ls-files --others --exclude-standard -- "))
-      return "UNTRACKED";
+    if (cmd.startsWith("git ls-files --others --exclude-standard -- ")) return "UNTRACKED";
 
     return cmd; // fallback (not expected)
   }
@@ -100,8 +97,7 @@ vi.mock("child_process", () => {
     const pats = excludes.map((p) => norm(p));
     const regexes = pats.map((p) => {
       if (p.endsWith("/")) return { type: "prefix" as const, p };
-      if (/[*?]/.test(p) || p.includes("**"))
-        return { type: "glob" as const, re: globToRegExp(p) };
+      if (/[*?]/.test(p) || p.includes("**")) return { type: "glob" as const, re: globToRegExp(p) };
 
       return { type: "prefix" as const, p };
     });
@@ -171,10 +167,9 @@ vi.mock("child_process", () => {
   function exec(
     cmd: string,
     optionsOrCb?: { maxBuffer?: number } | ExecCb,
-    maybeCb?: ExecCb
+    maybeCb?: ExecCb,
   ): ChildProcess {
-    const cb: ExecCb | undefined =
-      typeof optionsOrCb === "function" ? optionsOrCb : maybeCb;
+    const cb: ExecCb | undefined = typeof optionsOrCb === "function" ? optionsOrCb : maybeCb;
 
     const { cbError, stdout, stderr } = coreExecBehavior(cmd);
     cb?.(cbError, stdout, stderr);
@@ -189,7 +184,6 @@ vi.mock("child_process", () => {
       else resolve({ stdout, stderr });
     });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (exec as any)[util.promisify.custom] = custom;
 
   return { exec };
@@ -197,12 +191,14 @@ vi.mock("child_process", () => {
 
 // ---- fs/promises mock ----
 vi.mock("fs/promises", () => {
-  const writeFile = vi.fn(async (path: string, data: string, enc?: string) => {
-    fsState.writes.push({ path, data, enc });
-  });
+  const writeFile = vi.fn<(path: string, data: string, enc?: string) => Promise<void>>(
+    async (path: string, data: string, enc?: string) => {
+      fsState.writes.push({ path, data, enc });
+    },
+  );
 
   // NOTE: support both Buffer-return (no encoding) and string-return ("utf8")
-  const readFile = vi.fn(
+  const readFile = vi.fn<(path: string, enc?: string) => Promise<unknown>>(
     async (path: string, enc?: string): Promise<unknown> => {
       const f = fsState.files.get(path);
       if (!f) throw new Error(`ENOENT: ${path}`);
@@ -210,16 +206,18 @@ vi.mock("fs/promises", () => {
       if (!f.buf) throw new Error("No buffer");
 
       return enc === "utf8" ? f.buf.toString("utf8") : f.buf;
-    }
+    },
   );
 
-  const stat = vi.fn(async (path: string): Promise<{ size: number }> => {
-    const f = fsState.files.get(path);
-    if (!f) throw new Error(`ENOENT: ${path}`);
-    if (f.err) throw f.err;
+  const stat = vi.fn<(path: string) => Promise<{ size: number }>>(
+    async (path: string): Promise<{ size: number }> => {
+      const f = fsState.files.get(path);
+      if (!f) throw new Error(`ENOENT: ${path}`);
+      if (f.err) throw f.err;
 
-    return { size: f.size };
-  });
+      return { size: f.size };
+    },
+  );
 
   return { writeFile, readFile, stat };
 });
@@ -289,9 +287,7 @@ describe("generate.ts flow", () => {
     expect(out.data).toMatch(/File: a\.txt[\s\S]*hello/);
     expect(out.data).toMatch(/File: b\.bin[\s\S]*binary content skipped/);
     expect(out.data).toMatch(/File: huge\.txt[\s\S]*skipped: too large/);
-    expect(out.data).toMatch(
-      /File: err\.txt[\s\S]*<read error: Permission denied>/
-    );
+    expect(out.data).toMatch(/File: err\.txt[\s\S]*<read error: Permission denied>/);
 
     const logs = logSpy.mock.calls.flat().join("\n");
     expect(logs).toContain("--- Prompt (preview) ---");
@@ -397,12 +393,13 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({}),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const joinSpy: any = vi.fn((a: string, b: string) => `${a}/${b}`);
+    const joinSpy: any = vi.fn<(a: string, b: string) => string>(
+      (a: string, b: string) => `${a}/${b}`,
+    );
     await vi.doMock("path", async () => {
       const real = await vi.importActual("path");
 
@@ -431,15 +428,15 @@ describe("generate.ts flow", () => {
 
     // Return an empty string for repoRoot → falsy → falls back to __DIRNAME_SAFE
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue(""),
-      loadUserConfig: vi.fn().mockResolvedValue({}),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue(""),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
     }));
 
     // Spy join to inspect calls; mock keeps signature join(a, b)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const joinSpy: any = vi.fn((a: string, b: string) => `${a}/${b}`);
+    const joinSpy: any = vi.fn<(a: string, b: string) => string>(
+      (a: string, b: string) => `${a}/${b}`,
+    );
     await vi.doMock("path", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const real = await vi.importActual<any>("path");
 
       return { ...real, join: (...args: string[]) => joinSpy(...args) };
@@ -456,7 +453,7 @@ describe("generate.ts flow", () => {
         Array.isArray(a) &&
         typeof a[0] === "string" &&
         typeof a[1] === "string" &&
-        a[1] === "generated-prompt.txt"
+        a[1] === "generated-prompt.txt",
     );
     expect(outputJoinCall).toBeTruthy();
 
@@ -480,8 +477,8 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
         promptTemplateFile: "/repo/.github/prompt.tpl.md",
       }),
     }));
@@ -521,8 +518,8 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
         promptTemplateFile: "/repo/tpl.md",
         templatePreset: "minimal",
       }),
@@ -556,8 +553,8 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
         templatePreset: "minimal",
       }),
     }));
@@ -579,16 +576,11 @@ describe("generate.ts flow", () => {
 
     // default preset via empty config; PR template auto-discovery
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({}),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
     }));
 
-    const pr = [
-      "# Pull Request Template",
-      "",
-      "## 📝 Overview",
-      "- What was done",
-    ].join("\n");
+    const pr = ["# Pull Request Template", "", "## 📝 Overview", "- What was done"].join("\n");
 
     // auto-discovery candidate
     fsState.files.set("/repo/.github/pull_request_template.md", {
@@ -614,8 +606,10 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({ templatePreset: "default" }),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi
+        .fn<() => Promise<Record<string, unknown>>>()
+        .mockResolvedValue({ templatePreset: "default" }),
     }));
 
     const pr = "## Custom PR\n- item";
@@ -647,8 +641,10 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({ templatePreset: "default" }),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi
+        .fn<() => Promise<Record<string, unknown>>>()
+        .mockResolvedValue({ templatePreset: "default" }),
     }));
 
     const pr = "PR CONTENT";
@@ -658,13 +654,7 @@ describe("generate.ts flow", () => {
     });
 
     const { main } = await importSut();
-    process.argv = [
-      "node",
-      "script",
-      "--out=/repo/OUT.txt",
-      "--no-pr-template",
-      "--lines=50",
-    ];
+    process.argv = ["node", "script", "--out=/repo/OUT.txt", "--no-pr-template", "--lines=50"];
     await main();
 
     const out = fsState.writes.at(-1)!;
@@ -681,8 +671,10 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({ templatePreset: "minimal" }),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi
+        .fn<() => Promise<Record<string, unknown>>>()
+        .mockResolvedValue({ templatePreset: "minimal" }),
     }));
 
     // Even if a PR template exists, the minimal preset does not include a section heading
@@ -704,9 +696,7 @@ describe("generate.ts flow", () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("");
     gitMap.setStaged("");
-    gitMap.setUntracked(
-      ["dist/a.txt", "src/b.txt", "node_modules/x.js"].join("\n")
-    );
+    gitMap.setUntracked(["dist/a.txt", "src/b.txt", "node_modules/x.js"].join("\n"));
 
     fsState.files.set("src/b.txt", { size: 3, buf: Buffer.from("hey") });
 
@@ -727,16 +717,11 @@ describe("generate.ts flow", () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("DIFF\n");
     gitMap.setStaged("");
-    gitMap.setUntracked(
-      ["build/a.js", "logs/app.log", "src/ok.txt"].join("\n")
-    );
+    gitMap.setUntracked(["build/a.js", "logs/app.log", "src/ok.txt"].join("\n"));
 
     fsState.files.set("/repo/.d2p-ex.txt", {
       size: 100,
-      buf: Buffer.from(
-        ["logs", "*.tmp   # ignored", "   # comment", ""].join("\n"),
-        "utf8"
-      ),
+      buf: Buffer.from(["logs", "*.tmp   # ignored", "   # comment", ""].join("\n"), "utf8"),
     });
 
     fsState.files.set("src/ok.txt", { size: 2, buf: Buffer.from("ok") });
