@@ -1,4 +1,4 @@
-import { exec as cpExec } from "child_process";
+import { execFile as cpExecFile } from "child_process";
 import { readFile, writeFile, stat } from "fs/promises";
 import { join } from "path";
 import { promisify } from "util";
@@ -18,7 +18,7 @@ import {
 } from "./constants";
 import { tooLargeSkipped, binarySkipped, readError } from "./strings";
 
-const exec = promisify(cpExec);
+const execFile = promisify(cpExecFile);
 
 const __DIRNAME_SAFE =
   /* c8 ignore next */
@@ -79,8 +79,8 @@ export function parseArgs(argv: string[]): Partial<Options> {
   return out;
 }
 
-export async function runGit(cmd: string, opt: Options, cwd?: string): Promise<string> {
-  const { stdout } = (await exec(cmd, {
+export async function runGit(args: string[], opt: Options, cwd?: string): Promise<string> {
+  const { stdout } = (await execFile("git", args, {
     cwd,
     maxBuffer: opt.maxBuffer,
   })) as ExecResult;
@@ -119,10 +119,6 @@ function isAbsolutePathLike(p: string): boolean {
 function toGitSlash(p: string): string {
   return p.replace(/\\/g, "/");
 }
-function shellQuote(s: string): string {
-  // double-quote and escape embedded quotes for cmd/sh
-  return `"${s.replace(/"/g, '\\"')}"`;
-}
 
 /** Build git pathspec array: [".", ":(exclude)foo", ":(exclude)bar"] */
 async function buildPathspec(repoRoot: string, opt: Options): Promise<string[]> {
@@ -139,32 +135,33 @@ async function buildPathspec(repoRoot: string, opt: Options): Promise<string[]> 
   return ["."].concat([...patterns].map((p) => `:(exclude)${toGitSlash(p)}`));
 }
 
-async function buildDiffCommands(repoRoot: string, opt: Options): Promise<string[]> {
+async function buildDiffArgs(repoRoot: string, opt: Options): Promise<string[][]> {
   const ps = await buildPathspec(repoRoot, opt);
-  const psQuoted = ps.map(shellQuote).join(" ");
 
-  return [`git diff -- ${psQuoted}`, `git diff --cached -- ${psQuoted}`];
+  return [
+    ["diff", "--", ...ps],
+    ["diff", "--cached", "--", ...ps],
+  ];
 }
 
-async function buildUntrackedCommand(repoRoot: string, opt: Options): Promise<string> {
+async function buildUntrackedArgs(repoRoot: string, opt: Options): Promise<string[]> {
   const ps = await buildPathspec(repoRoot, opt);
-  const psQuoted = ps.map(shellQuote).join(" ");
 
-  return `git ls-files --others --exclude-standard -- ${psQuoted}`;
+  return ["ls-files", "--others", "--exclude-standard", "--", ...ps];
 }
 
 export async function collectDiff(opt: Options): Promise<string> {
   // Resolve repo root for pathspec resolution and exclude-file
   const repoRoot = (await getRepoRootSafe()) ?? process.cwd();
 
-  const [diffCmd, diffCachedCmd] = await buildDiffCommands(repoRoot, opt);
-  const unstaged = await runGit(diffCmd, opt, repoRoot);
-  const staged = await runGit(diffCachedCmd, opt, repoRoot);
+  const [diffArgs, diffCachedArgs] = await buildDiffArgs(repoRoot, opt);
+  const unstaged = await runGit(diffArgs, opt, repoRoot);
+  const staged = await runGit(diffCachedArgs, opt, repoRoot);
   let full = (unstaged + staged).trim();
 
   if (opt.includeUntracked) {
-    const untrackedCmd = await buildUntrackedCommand(repoRoot, opt);
-    const filesStdout = await runGit(untrackedCmd, opt, repoRoot);
+    const untrackedArgs = await buildUntrackedArgs(repoRoot, opt);
+    const filesStdout = await runGit(untrackedArgs, opt, repoRoot);
     const files = filesStdout
       .split("\n")
       .map((s) => s.trim())
@@ -252,7 +249,7 @@ export async function main() {
 
   try {
     // Validate git repo (leave constant in use)
-    await runGit("git rev-parse --show-toplevel", merged);
+    await runGit(["rev-parse", "--show-toplevel"], merged);
 
     const patchContent = await collectDiff(merged);
 

@@ -25,7 +25,11 @@ const gitMap = vi.hoisted(() => ({
 const fsState = vi.hoisted(() => ({
   files: new Map<string, { size: number; buf?: Buffer; err?: Error }>(),
   writes: [] as Array<{ path: string; data: string; enc?: string }>,
-  execCalls: [] as Array<{ cmd: string; opts?: { cwd?: string; maxBuffer?: number } }>,
+  execCalls: [] as Array<{
+    file: string;
+    args: string[];
+    opts?: { cwd?: string; maxBuffer?: number };
+  }>,
   reset() {
     this.files.clear();
     this.writes.length = 0;
@@ -34,17 +38,24 @@ const fsState = vi.hoisted(() => ({
 }));
 
 // ---- child_process mock ----
-// New logic: git commands are dynamic (with pathspec), so dispatch by prefix match.
+// New logic: git commands are dynamic (with pathspec), so dispatch by argv shape.
 vi.mock("child_process", () => {
   type ExecCb = (error: Error | null, stdout?: string, stderr?: string) => void;
 
-  function resolveKey(cmd: string): "ROOT" | "UNSTAGED" | "STAGED" | "UNTRACKED" | string {
-    if (cmd.startsWith("git rev-parse --show-toplevel")) return "ROOT";
-    if (cmd.startsWith("git diff --cached -- ")) return "STAGED";
-    if (cmd.startsWith("git diff -- ")) return "UNSTAGED";
-    if (cmd.startsWith("git ls-files --others --exclude-standard -- ")) return "UNTRACKED";
+  function resolveKey(args: string[]): "ROOT" | "UNSTAGED" | "STAGED" | "UNTRACKED" | string {
+    if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return "ROOT";
+    if (args[0] === "diff" && args[1] === "--cached" && args[2] === "--") return "STAGED";
+    if (args[0] === "diff" && args[1] === "--") return "UNSTAGED";
+    if (
+      args[0] === "ls-files" &&
+      args[1] === "--others" &&
+      args[2] === "--exclude-standard" &&
+      args[3] === "--"
+    ) {
+      return "UNTRACKED";
+    }
 
-    return cmd; // fallback (not expected)
+    return args.join(" "); // fallback (not expected)
   }
 
   // --- pathspec helpers ----
@@ -61,35 +72,12 @@ vi.mock("child_process", () => {
     return new RegExp("^" + g + "$");
   }
 
-  function parseExcludesFromCmd(cmd: string): string[] {
-    const idx = cmd.indexOf(" -- ");
+  function parseExcludesFromArgs(args: string[]): string[] {
+    const idx = args.indexOf("--");
     if (idx < 0) return [];
-    const tail = cmd.slice(idx + 4).trim();
 
-    const tokens: string[] = [];
-    let cur = "";
-    let inQ = false;
-
-    for (let i = 0; i < tail.length; i++) {
-      const ch = tail[i];
-
-      if (ch === '"') {
-        inQ = !inQ;
-        continue;
-      }
-
-      if (!inQ && /\s/.test(ch)) {
-        if (cur.length) {
-          tokens.push(cur);
-          cur = "";
-        }
-        continue;
-      }
-      cur += ch;
-    }
-    if (cur.length) tokens.push(cur);
-
-    return tokens
+    return args
+      .slice(idx + 1)
       .filter((t) => t.startsWith(":(exclude)"))
       .map((t) => t.slice(":(exclude)".length));
   }
@@ -127,17 +115,17 @@ vi.mock("child_process", () => {
     return out;
   }
 
-  function coreExecBehavior(cmd: string): {
+  function coreExecBehavior(args: string[]): {
     cbError: Error | null;
     promiseReject: Error | string | null;
     stdout: string;
     stderr: string;
   } {
-    const key = resolveKey(cmd);
+    const key = resolveKey(args);
     let out = gitMap.data.get(key) ?? "";
 
     if (key === "UNTRACKED") {
-      const excludes = parseExcludesFromCmd(cmd);
+      const excludes = parseExcludesFromArgs(args);
       out = filterListByExcludes(out, excludes);
     }
 
@@ -166,31 +154,34 @@ vi.mock("child_process", () => {
     };
   }
 
-  function exec(
-    cmd: string,
+  function execFile(
+    file: string,
+    args: string[],
     optionsOrCb?: { cwd?: string; maxBuffer?: number } | ExecCb,
     maybeCb?: ExecCb,
   ): ChildProcess {
     const cb: ExecCb | undefined = typeof optionsOrCb === "function" ? optionsOrCb : maybeCb;
-    if (typeof optionsOrCb !== "function") fsState.execCalls.push({ cmd, opts: optionsOrCb });
+    if (typeof optionsOrCb !== "function") {
+      fsState.execCalls.push({ file, args, opts: optionsOrCb });
+    }
 
-    const { cbError, stdout, stderr } = coreExecBehavior(cmd);
+    const { cbError, stdout, stderr } = coreExecBehavior(args);
     cb?.(cbError, stdout, stderr);
 
     return {} as ChildProcess;
   }
 
-  const custom = (cmd: string, opts?: { cwd?: string; maxBuffer?: number }) =>
+  const custom = (file: string, args: string[], opts?: { cwd?: string; maxBuffer?: number }) =>
     new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-      fsState.execCalls.push({ cmd, opts });
-      const { promiseReject, stdout, stderr } = coreExecBehavior(cmd);
+      fsState.execCalls.push({ file, args, opts });
+      const { promiseReject, stdout, stderr } = coreExecBehavior(args);
       if (promiseReject !== null) reject(promiseReject);
       else resolve({ stdout, stderr });
     });
 
-  (exec as any)[util.promisify.custom] = custom;
+  (execFile as any)[util.promisify.custom] = custom;
 
-  return { exec };
+  return { execFile };
 });
 
 // ---- fs/promises mock ----
@@ -330,10 +321,14 @@ describe("generate.ts flow", () => {
       expect(s).toContain("created");
 
       const collectGitCalls = fsState.execCalls.filter(
-        ({ cmd }) =>
-          cmd.startsWith("git diff -- ") ||
-          cmd.startsWith("git diff --cached -- ") ||
-          cmd.startsWith("git ls-files --others --exclude-standard -- "),
+        ({ file, args }) =>
+          file === "git" &&
+          ((args[0] === "diff" && args[1] === "--") ||
+            (args[0] === "diff" && args[1] === "--cached" && args[2] === "--") ||
+            (args[0] === "ls-files" &&
+              args[1] === "--others" &&
+              args[2] === "--exclude-standard" &&
+              args[3] === "--")),
       );
       expect(collectGitCalls.map(({ opts }) => opts?.cwd)).toEqual([
         "C:/repo",
@@ -873,7 +868,7 @@ describe("generate.ts flow", () => {
     expect(s).not.toContain("File: logs/a.log");
   });
 
-  it("collectDiff(): --exclude supports patterns with spaces (shellQuote path)", async () => {
+  it("collectDiff(): --exclude supports patterns with spaces", async () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("");
     gitMap.setStaged("");
@@ -891,5 +886,24 @@ describe("generate.ts flow", () => {
     expect(s).toContain("File: src/ok.txt");
     expect(s).toContain("ok");
     expect(s).not.toContain("File: build dir/a.js");
+  });
+
+  it("collectDiff(): passes shell-looking excludes as a single git argv item", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("DIFF\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    const { collectDiff, defaultOptions } = await importSut();
+    await collectDiff({
+      ...defaultOptions,
+      includeUntracked: false,
+      exclude: ["$(touch injected)"],
+    });
+
+    const diffCall = fsState.execCalls.find(
+      ({ file, args }) => file === "git" && args[0] === "diff" && args[1] === "--",
+    );
+    expect(diffCall?.args).toEqual(["diff", "--", ".", ":(exclude)$(touch injected)"]);
   });
 });
