@@ -1,4 +1,4 @@
-import { exec as cpExec } from "child_process";
+import { execFile as cpExecFile } from "child_process";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { promisify } from "util";
@@ -6,7 +6,7 @@ import { promisify } from "util";
 import { DEFAULT_OUTPUT_FILENAME } from "./constants";
 import type { Options } from "./generate-prompt-from-git-diff";
 
-const exec = promisify(cpExec);
+const execFile = promisify(cpExecFile);
 
 export type UserConfig = Partial<{
   outputPath: string;
@@ -54,7 +54,7 @@ type StringArrayKeys<T, IncludeOptional extends boolean = true> = KeysByType<
 
 export async function getRepoRootSafe(): Promise<string | null> {
   try {
-    const res = await exec("git rev-parse --show-toplevel");
+    const res = await execFile("git", ["rev-parse", "--show-toplevel"]);
 
     // Handle possible shapes from promisified exec:
     // - string                => stdout

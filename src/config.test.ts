@@ -40,7 +40,11 @@ vi.mock("child_process", async () => {
     shape: "string" as "string" | "array" | "object",
   });
 
-  function rawExec(_cmd: string, cb?: (err: unknown, stdout: string, stderr: string) => void) {
+  function rawExecFile(
+    _file: string,
+    _args: string[],
+    cb?: (err: unknown, stdout: string, stderr: string) => void,
+  ) {
     if (execState.throws) {
       const err = new Error("fail");
       cb?.(err, "", "");
@@ -53,7 +57,7 @@ vi.mock("child_process", async () => {
   }
 
   // Key point: switch the return "shape" via promisify.custom
-  (rawExec as any)[promisify.custom] = (_: string) => {
+  (rawExecFile as any)[promisify.custom] = (_file: string, _args: string[]) => {
     if (execState.throws) {
       return Promise.reject(new Error("fail"));
     }
@@ -67,7 +71,7 @@ vi.mock("child_process", async () => {
     }
   };
 
-  return { exec: rawExec };
+  return { execFile: rawExecFile };
 });
 
 vi.mock("path", async (orig) => {
