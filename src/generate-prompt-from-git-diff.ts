@@ -57,21 +57,25 @@ export function parseArgs(argv: string[]): Partial<Options> {
   const excludes: string[] = [];
 
   for (const a of argv.slice(2)) {
-    if (a.startsWith("--lines=")) out.maxConsoleLines = Number(a.split("=")[1]);
+    if (a.startsWith("--lines=")) out.maxConsoleLines = Number(a.slice("--lines=".length));
     else if (a === "--no-untracked") out.includeUntracked = false;
-    else if (a.startsWith("--out=")) out.outputPath = a.split("=")[1]!;
-    else if (a.startsWith("--max-new-size=")) out.maxNewFileSizeBytes = Number(a.split("=")[1]);
-    else if (a.startsWith("--max-buffer=")) out.maxBuffer = Number(a.split("=")[1]);
-    else if (a.startsWith("--template-file=")) out.promptTemplateFile = a.split("=")[1]!;
+    else if (a.startsWith("--out=")) out.outputPath = a.slice("--out=".length);
+    else if (a.startsWith("--max-new-size="))
+      out.maxNewFileSizeBytes = Number(a.slice("--max-new-size=".length));
+    else if (a.startsWith("--max-buffer=")) out.maxBuffer = Number(a.slice("--max-buffer=".length));
+    else if (a.startsWith("--template-file="))
+      out.promptTemplateFile = a.slice("--template-file=".length);
     else if (a.startsWith("--template=")) out.promptTemplate = a.slice("--template=".length);
     else if (a === "--no-pr-template") out.includePrTemplate = false;
-    else if (a.startsWith("--pr-template-file=")) out.prTemplateFile = a.split("=")[1]!;
-    else if (a.startsWith("--template-preset=")) out.templatePreset = a.split("=")[1]!;
+    else if (a.startsWith("--pr-template-file="))
+      out.prTemplateFile = a.slice("--pr-template-file=".length);
+    else if (a.startsWith("--template-preset="))
+      out.templatePreset = a.slice("--template-preset=".length);
     else if (a.startsWith("--exclude=")) {
       const v = a.slice("--exclude=".length).trim();
       if (v) excludes.push(v);
     } else if (a.startsWith("--exclude-file=")) {
-      out.excludeFile = a.split("=")[1]!;
+      out.excludeFile = a.slice("--exclude-file=".length);
     }
   }
   if (excludes.length) out.exclude = excludes;
