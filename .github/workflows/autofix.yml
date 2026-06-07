@@ -1,0 +1,52 @@
+name: autofix.ci # needed to securely identify the workflow
+
+on:
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  autofix:
+    name: Autofix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # needed for autofix-ci/action to push fixes
+      pull-requests: write # needed for autofix-ci/action to update the pull request
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
+        with:
+          setup-aqua: "true"
+          bun-version: aqua
+          bun-cache: "true"
+
+      - name: Fix aqua-checksums.json
+        run: aqua upc -prune
+
+      - name: Install dependencies
+        shell: bash
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          if [ "$PR_AUTHOR" = "dependabot[bot]" ]; then
+            bun install
+          else
+            bun install --frozen-lockfile
+          fi
+
+      - name: Run check:fix
+        shell: bash
+        run: bun run check:fix
+
+      - name: Run autofix.ci
+        uses: autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a # v1.3.4
