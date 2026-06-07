@@ -116,6 +116,9 @@ async function readLinesIfExists(path: string): Promise<string[]> {
 function isAbsolutePathLike(p: string): boolean {
   return /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith("\\\\") || p.startsWith("/");
 }
+function resolveRepoPath(repoRoot: string, p: string): string {
+  return isAbsolutePathLike(p) ? p : join(repoRoot, p);
+}
 function toGitSlash(p: string): string {
   return p.replace(/\\/g, "/");
 }
@@ -210,9 +213,7 @@ export function printPreview(prompt: string, maxLines: number) {
 export async function loadPrTemplateText(repoRoot: string, opt: Options): Promise<string | null> {
   // 1) Explicit path if provided
   if (opt.prTemplateFile) {
-    const p = isAbsolutePathLike(opt.prTemplateFile)
-      ? opt.prTemplateFile
-      : join(repoRoot, opt.prTemplateFile);
+    const p = resolveRepoPath(repoRoot, opt.prTemplateFile);
     const txt = await readTextFileIfExists(p);
     if (txt && txt.trim()) return txt;
   }
@@ -261,7 +262,8 @@ export async function main() {
       templateText = merged.promptTemplate.trim();
     } else if (merged.promptTemplateFile) {
       // 2) Template file
-      const txt = await readTextFileIfExists(merged.promptTemplateFile);
+      const templatePath = resolveRepoPath(repoRoot, merged.promptTemplateFile);
+      const txt = await readTextFileIfExists(templatePath);
       templateText = txt?.trim();
     }
 
