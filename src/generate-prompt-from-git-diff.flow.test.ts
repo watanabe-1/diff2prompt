@@ -676,6 +676,34 @@ describe("generate.ts flow", () => {
     expect(out.data).not.toMatch(/### Pull Request Template[\s\S]*PR CONTENT/);
   });
 
+  it("main(): includePrTemplate false in config disables default PR template embedding", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("F2\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    await vi.doMock("./config", () => ({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
+        includePrTemplate: false,
+        templatePreset: "default",
+      }),
+    }));
+
+    fsState.files.set("/repo/.github/pull_request_template.md", {
+      size: 10,
+      buf: Buffer.from("PR CONFIG", "utf8"),
+    });
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--out=/repo/OUT.txt", "--lines=50"];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.data).not.toContain("PR CONFIG");
+    expect(out.data).not.toMatch(/### Pull Request Template[\s\S]*PR CONFIG/);
+  });
+
   it("main(): minimal preset should not add PR template section title automatically", async () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("G\n");

@@ -32,10 +32,10 @@ By default, the tool:
   - **Commit message** (Conventional Commits)
   - **PR title** (mirrors the commit)
   - **Branch name** (scoped kebab-case)
-  - **Pull request template content** (if configured)
+  - **Pull request template content** (if a template is found)
 
 - Prints a **preview** (first N lines) to the console
-- Writes the **full prompt** to `generated-prompt.txt` (or `pull_request_template.md` if that mode is enabled) at the repo root
+- Writes the **full prompt** to `generated-prompt.txt` at the repo root
 
 ---
 
@@ -44,7 +44,7 @@ By default, the tool:
 ```bash
 diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--max-buffer=BYTES] \
             [--template=STRING] [--template-file=PATH] [--template-preset=NAME] \
-            [--exclude=GLOB] [--exclude-file=PATH] [--pr-template-file=PATH] [--include-pr-template]
+            [--exclude=GLOB] [--exclude-file=PATH] [--pr-template-file=PATH] [--no-pr-template]
 ```
 
 ### Flags
@@ -81,11 +81,13 @@ diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--
 - `--exclude-file=PATH`
   Load exclude patterns (one per line, `#` for comments). Relative paths are resolved against the repo root.
 
-- `--include-pr-template`
-  Append the contents of the repository’s `pull_request_template.md` (or file specified with `--pr-template-file`).
+- `--no-pr-template`
+  Do **not** search for or embed the repository's `pull_request_template.md`.
 
 - `--pr-template-file=PATH`
   Explicit path to a PR template file. Can be absolute or relative to the repo root.
+  PR templates are searched for and embedded by default unless `--no-pr-template`
+  or `"includePrTemplate": false` is set.
 
 ### Environment variables
 
@@ -125,7 +127,8 @@ You can set persistent defaults via any of the following (first match wins):
 
 - `outputPath` takes precedence over `outputFile` if both are present.
 - `promptTemplate` (inline string) has the highest priority, then `promptTemplateFile`, then `templatePreset`, then built-in default.
-- `includePrTemplate` tells diff2prompt to append the PR template’s contents into the generated prompt.
+- `includePrTemplate` controls whether diff2prompt searches for and embeds PR template contents.
+  It defaults to `true`; set it to `false` to disable PR template embedding.
 - `prTemplateFile` specifies a custom path to the PR template.
 - Relative paths are resolved against the repo root.
 - `exclude` and `excludeFile` let you filter out noisy untracked files.
@@ -150,8 +153,8 @@ diff2prompt --exclude="build dir"
 # Exclude from a file
 diff2prompt --exclude-file=.gitignore
 
-# Include the repository’s pull request template
-diff2prompt --include-pr-template
+# Disable automatic pull request template embedding
+diff2prompt --no-pr-template
 
 # Use a custom PR template file
 diff2prompt --pr-template-file=.github/custom_pr_template.md
@@ -161,14 +164,17 @@ diff2prompt --pr-template-file=.github/custom_pr_template.md
 
 ## FAQ
 
-**Q: It says “No changes found: neither diffs nor new files.”**
+**Q: It says "No changes found: neither diffs nor new files."**
 A: Stage or modify files first. The tool aggregates `git diff`, `git diff --cached`, and (optionally) untracked files.
 
-**Q: Why are some files “binary content skipped”?**
+**Q: Why are some files "binary content skipped"?**
 A: Binary detection avoids pasting unreadable data into the prompt (and blowing up your token count).
 
 **Q: Why does the prompt sometimes end with a PR template?**
-A: Because you enabled `includePrTemplate` (via config or `--include-pr-template`). This appends the `pull_request_template.md` content so you can paste everything into your AI assistant’s canvas at once.
+A: PR template embedding is enabled by default. If a `pull_request_template.md`
+is found, diff2prompt appends it so you can paste everything into your AI
+assistant's canvas at once. Use `--no-pr-template` or `"includePrTemplate": false`
+to disable it.
 
 ---
 
