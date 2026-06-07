@@ -347,9 +347,7 @@ describe("generate.ts flow", () => {
       const normalize = (path: string) => path.replace(/\\/g, "/");
 
       expect(normalize(statMock.mock.calls.at(-1)?.[0] as string)).toBe("C:/repo/src/new.txt");
-      expect(normalize(readFileMock.mock.calls.at(-1)?.[0] as string)).toBe(
-        "C:/repo/src/new.txt",
-      );
+      expect(normalize(readFileMock.mock.calls.at(-1)?.[0] as string)).toBe("C:/repo/src/new.txt");
     } finally {
       cwdSpy.mockRestore();
     }
