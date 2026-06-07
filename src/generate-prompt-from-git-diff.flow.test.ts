@@ -191,27 +191,33 @@ vi.mock("child_process", () => {
 
 // ---- fs/promises mock ----
 vi.mock("fs/promises", () => {
-  const writeFile = vi.fn(async (path: string, data: string, enc?: string) => {
-    fsState.writes.push({ path, data, enc });
-  });
+  const writeFile = vi.fn<(path: string, data: string, enc?: string) => Promise<void>>(
+    async (path: string, data: string, enc?: string) => {
+      fsState.writes.push({ path, data, enc });
+    },
+  );
 
   // NOTE: support both Buffer-return (no encoding) and string-return ("utf8")
-  const readFile = vi.fn(async (path: string, enc?: string): Promise<unknown> => {
-    const f = fsState.files.get(path);
-    if (!f) throw new Error(`ENOENT: ${path}`);
-    if (f.err) throw f.err;
-    if (!f.buf) throw new Error("No buffer");
+  const readFile = vi.fn<(path: string, enc?: string) => Promise<unknown>>(
+    async (path: string, enc?: string): Promise<unknown> => {
+      const f = fsState.files.get(path);
+      if (!f) throw new Error(`ENOENT: ${path}`);
+      if (f.err) throw f.err;
+      if (!f.buf) throw new Error("No buffer");
 
-    return enc === "utf8" ? f.buf.toString("utf8") : f.buf;
-  });
+      return enc === "utf8" ? f.buf.toString("utf8") : f.buf;
+    },
+  );
 
-  const stat = vi.fn(async (path: string): Promise<{ size: number }> => {
-    const f = fsState.files.get(path);
-    if (!f) throw new Error(`ENOENT: ${path}`);
-    if (f.err) throw f.err;
+  const stat = vi.fn<(path: string) => Promise<{ size: number }>>(
+    async (path: string): Promise<{ size: number }> => {
+      const f = fsState.files.get(path);
+      if (!f) throw new Error(`ENOENT: ${path}`);
+      if (f.err) throw f.err;
 
-    return { size: f.size };
-  });
+      return { size: f.size };
+    },
+  );
 
   return { writeFile, readFile, stat };
 });
@@ -387,11 +393,13 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({}),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
     }));
 
-    const joinSpy: any = vi.fn((a: string, b: string) => `${a}/${b}`);
+    const joinSpy: any = vi.fn<(a: string, b: string) => string>(
+      (a: string, b: string) => `${a}/${b}`,
+    );
     await vi.doMock("path", async () => {
       const real = await vi.importActual("path");
 
@@ -420,12 +428,14 @@ describe("generate.ts flow", () => {
 
     // Return an empty string for repoRoot → falsy → falls back to __DIRNAME_SAFE
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue(""),
-      loadUserConfig: vi.fn().mockResolvedValue({}),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue(""),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
     }));
 
     // Spy join to inspect calls; mock keeps signature join(a, b)
-    const joinSpy: any = vi.fn((a: string, b: string) => `${a}/${b}`);
+    const joinSpy: any = vi.fn<(a: string, b: string) => string>(
+      (a: string, b: string) => `${a}/${b}`,
+    );
     await vi.doMock("path", async () => {
       const real = await vi.importActual<any>("path");
 
@@ -467,8 +477,8 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
         promptTemplateFile: "/repo/.github/prompt.tpl.md",
       }),
     }));
@@ -508,8 +518,8 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
         promptTemplateFile: "/repo/tpl.md",
         templatePreset: "minimal",
       }),
@@ -543,8 +553,8 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
         templatePreset: "minimal",
       }),
     }));
@@ -566,8 +576,8 @@ describe("generate.ts flow", () => {
 
     // default preset via empty config; PR template auto-discovery
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({}),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
     }));
 
     const pr = ["# Pull Request Template", "", "## 📝 Overview", "- What was done"].join("\n");
@@ -596,8 +606,10 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({ templatePreset: "default" }),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi
+        .fn<() => Promise<Record<string, unknown>>>()
+        .mockResolvedValue({ templatePreset: "default" }),
     }));
 
     const pr = "## Custom PR\n- item";
@@ -629,8 +641,10 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({ templatePreset: "default" }),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi
+        .fn<() => Promise<Record<string, unknown>>>()
+        .mockResolvedValue({ templatePreset: "default" }),
     }));
 
     const pr = "PR CONTENT";
@@ -657,8 +671,10 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     await vi.doMock("./config", () => ({
-      getRepoRootSafe: vi.fn().mockResolvedValue("/repo"),
-      loadUserConfig: vi.fn().mockResolvedValue({ templatePreset: "minimal" }),
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi
+        .fn<() => Promise<Record<string, unknown>>>()
+        .mockResolvedValue({ templatePreset: "minimal" }),
     }));
 
     // Even if a PR template exists, the minimal preset does not include a section heading

@@ -12,7 +12,7 @@ const norm = (p: string) => p.replace(/\\/g, "/");
 
 vi.mock("fs/promises", () => {
   return {
-    readFile: vi.fn((p: string) => {
+    readFile: vi.fn<(p: string) => Promise<string>>((p: string) => {
       const key = norm(String(p));
       const v = mockFiles.get(key);
       if (v === null) return Promise.reject(new Error("ENOENT"));
@@ -20,8 +20,8 @@ vi.mock("fs/promises", () => {
 
       return Promise.resolve(v);
     }),
-    writeFile: vi.fn(),
-    stat: vi.fn(),
+    writeFile: vi.fn<() => void>(),
+    stat: vi.fn<() => void>(),
   };
 });
 

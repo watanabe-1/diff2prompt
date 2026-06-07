@@ -12,15 +12,17 @@ import { mergeOptions, resolveDefaultOutputPath } from "./config";
 
 vi.mock("fs/promises", () => {
   return {
-    readFile: vi.fn(async (path: string, enc?: string) => {
-      if (path === "ok.txt")
-        return enc === "utf8" ? "HELLO TEMPLATE" : Buffer.from("HELLO TEMPLATE", "utf8");
-      if (path === "ex.txt")
-        return enc === "utf8"
-          ? ["dist", "*.lock"].join("\n")
-          : Buffer.from("dist\n*.lock\n", "utf8");
-      throw new Error("fail");
-    }),
+    readFile: vi.fn<(path: string, enc?: string) => Promise<string | Buffer>>(
+      async (path: string, enc?: string) => {
+        if (path === "ok.txt")
+          return enc === "utf8" ? "HELLO TEMPLATE" : Buffer.from("HELLO TEMPLATE", "utf8");
+        if (path === "ex.txt")
+          return enc === "utf8"
+            ? ["dist", "*.lock"].join("\n")
+            : Buffer.from("dist\n*.lock\n", "utf8");
+        throw new Error("fail");
+      },
+    ),
   };
 });
 
