@@ -190,7 +190,6 @@ export async function collectDiff(opt: Options): Promise<string> {
         }
       }
     }
-
   }
 
   if (!full.trim()) {
