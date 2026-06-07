@@ -2,6 +2,7 @@ import { exec as cpExec } from "child_process";
 import { readFile, writeFile, stat } from "fs/promises";
 import { join } from "path";
 import { promisify } from "util";
+
 import { getRepoRootSafe, loadUserConfig } from "./config";
 import {
   MAX_CONSOLE_LINES_DEFAULT,
@@ -43,8 +44,7 @@ export interface Options {
 }
 
 export const defaultOptions: Options = {
-  maxConsoleLines:
-    Number(process.env.MAX_CONSOLE_LINES) || MAX_CONSOLE_LINES_DEFAULT,
+  maxConsoleLines: Number(process.env.MAX_CONSOLE_LINES) || MAX_CONSOLE_LINES_DEFAULT,
   outputPath: "", // temporary, set in main()
   includeUntracked: true,
   maxNewFileSizeBytes: MAX_NEWFILE_SIZE_BYTES,
@@ -60,19 +60,13 @@ export function parseArgs(argv: string[]): Partial<Options> {
     if (a.startsWith("--lines=")) out.maxConsoleLines = Number(a.split("=")[1]);
     else if (a === "--no-untracked") out.includeUntracked = false;
     else if (a.startsWith("--out=")) out.outputPath = a.split("=")[1]!;
-    else if (a.startsWith("--max-new-size="))
-      out.maxNewFileSizeBytes = Number(a.split("=")[1]);
-    else if (a.startsWith("--max-buffer="))
-      out.maxBuffer = Number(a.split("=")[1]);
-    else if (a.startsWith("--template-file="))
-      out.promptTemplateFile = a.split("=")[1]!;
-    else if (a.startsWith("--template="))
-      out.promptTemplate = a.slice("--template=".length);
+    else if (a.startsWith("--max-new-size=")) out.maxNewFileSizeBytes = Number(a.split("=")[1]);
+    else if (a.startsWith("--max-buffer=")) out.maxBuffer = Number(a.split("=")[1]);
+    else if (a.startsWith("--template-file=")) out.promptTemplateFile = a.split("=")[1]!;
+    else if (a.startsWith("--template=")) out.promptTemplate = a.slice("--template=".length);
     else if (a === "--no-pr-template") out.includePrTemplate = false;
-    else if (a.startsWith("--pr-template-file="))
-      out.prTemplateFile = a.split("=")[1]!;
-    else if (a.startsWith("--template-preset="))
-      out.templatePreset = a.split("=")[1]!;
+    else if (a.startsWith("--pr-template-file=")) out.prTemplateFile = a.split("=")[1]!;
+    else if (a.startsWith("--template-preset=")) out.templatePreset = a.split("=")[1]!;
     else if (a.startsWith("--exclude=")) {
       const v = a.slice("--exclude=".length).trim();
       if (v) excludes.push(v);
@@ -97,9 +91,7 @@ export function looksBinary(buf: Buffer): boolean {
   return buf.includes(0);
 }
 
-export async function readTextFileIfExists(
-  path: string
-): Promise<string | null> {
+export async function readTextFileIfExists(path: string): Promise<string | null> {
   try {
     const buf = await readFile(path, "utf8");
 
@@ -132,10 +124,7 @@ function shellQuote(s: string): string {
 }
 
 /** Build git pathspec array: [".", ":(exclude)foo", ":(exclude)bar"] */
-async function buildPathspec(
-  repoRoot: string,
-  opt: Options
-): Promise<string[]> {
+async function buildPathspec(repoRoot: string, opt: Options): Promise<string[]> {
   const patterns = new Set<string>();
   for (const p of opt.exclude ?? []) patterns.add(p);
   if (opt.excludeFile) {
@@ -149,20 +138,14 @@ async function buildPathspec(
   return ["."].concat([...patterns].map((p) => `:(exclude)${toGitSlash(p)}`));
 }
 
-async function buildDiffCommands(
-  repoRoot: string,
-  opt: Options
-): Promise<string[]> {
+async function buildDiffCommands(repoRoot: string, opt: Options): Promise<string[]> {
   const ps = await buildPathspec(repoRoot, opt);
   const psQuoted = ps.map(shellQuote).join(" ");
 
   return [`git diff -- ${psQuoted}`, `git diff --cached -- ${psQuoted}`];
 }
 
-async function buildUntrackedCommand(
-  repoRoot: string,
-  opt: Options
-): Promise<string> {
+async function buildUntrackedCommand(repoRoot: string, opt: Options): Promise<string> {
   const ps = await buildPathspec(repoRoot, opt);
   const psQuoted = ps.map(shellQuote).join(" ");
 
@@ -225,10 +208,7 @@ export function printPreview(prompt: string, maxLines: number) {
   if (lines.length > maxLines) console.log(TRUNCATED_LINE);
 }
 
-export async function loadPrTemplateText(
-  repoRoot: string,
-  opt: Options
-): Promise<string | null> {
+export async function loadPrTemplateText(repoRoot: string, opt: Options): Promise<string | null> {
   // 1) Explicit path if provided
   if (opt.prTemplateFile) {
     const p = isAbsolutePathLike(opt.prTemplateFile)
@@ -265,10 +245,7 @@ export async function main() {
   };
 
   if (!merged.outputPath) {
-    merged.outputPath = join(
-      repoRoot || __DIRNAME_SAFE,
-      DEFAULT_OUTPUT_FILENAME
-    );
+    merged.outputPath = join(repoRoot || __DIRNAME_SAFE, DEFAULT_OUTPUT_FILENAME);
   }
 
   try {
@@ -322,10 +299,7 @@ export async function main() {
   }
 }
 
-export function renderTemplate(
-  tpl: string,
-  data: Record<string, string>
-): string {
+export function renderTemplate(tpl: string, data: Record<string, string>): string {
   // Simple {{key}} replacement (raw substitution without escaping)
   return tpl.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, k) => {
     return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : "";

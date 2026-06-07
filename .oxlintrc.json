@@ -1,0 +1,48 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/bin/**",
+    "**/coverage/**",
+    "**/test-results/**"
+  ],
+  "jsPlugins": ["./oxlint/diff2prompt.mjs"],
+  "options": {
+    "reportUnusedDisableDirectives": "error"
+  },
+  "rules": {
+    "diff2prompt/comment-spacing": "error",
+    "diff2prompt/padding-line-before-return": "error",
+    "eqeqeq": "error",
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "destructuredArrayIgnorePattern": "^_"
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.test.mts", "**/*.test.cts"],
+      "plugins": ["vitest"],
+      "env": {
+        "vitest": true
+      },
+      "rules": {
+        "vitest/consistent-test-it": ["error", { "fn": "it" }],
+        "vitest/require-top-level-describe": "error",
+        "vitest/no-focused-tests": "error",
+        "vitest/no-disabled-tests": "error",
+        "vitest/no-duplicate-hooks": "error",
+        "vitest/no-standalone-expect": "error",
+        "vitest/expect-expect": "error",
+        "vitest/no-conditional-expect": "error",
+        "diff2prompt/no-export": "error"
+      }
+    }
+  ]
+}

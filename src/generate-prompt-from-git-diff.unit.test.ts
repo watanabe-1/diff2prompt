@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { mergeOptions, resolveDefaultOutputPath } from "./config";
+
 import {
   parseArgs,
   looksBinary,
@@ -8,14 +8,13 @@ import {
   renderTemplate,
   readTextFileIfExists,
 } from "../src/generate-prompt-from-git-diff";
+import { mergeOptions, resolveDefaultOutputPath } from "./config";
 
 vi.mock("fs/promises", () => {
   return {
     readFile: vi.fn(async (path: string, enc?: string) => {
       if (path === "ok.txt")
-        return enc === "utf8"
-          ? "HELLO TEMPLATE"
-          : Buffer.from("HELLO TEMPLATE", "utf8");
+        return enc === "utf8" ? "HELLO TEMPLATE" : Buffer.from("HELLO TEMPLATE", "utf8");
       if (path === "ex.txt")
         return enc === "utf8"
           ? ["dist", "*.lock"].join("\n")
@@ -77,12 +76,7 @@ describe("parseArgs", () => {
 
   // --- NEW ---
   it("parses --no-pr-template and --pr-template-file", () => {
-    const p = parseArgs([
-      "node",
-      "script",
-      "--no-pr-template",
-      "--pr-template-file=.github/PR.md",
-    ]);
+    const p = parseArgs(["node", "script", "--no-pr-template", "--pr-template-file=.github/PR.md"]);
     expect(p.includePrTemplate).toBe(false);
     expect(p.prTemplateFile).toBe(".github/PR.md");
   });
@@ -105,16 +99,8 @@ describe("merge behavior (defaults -> file -> cli)", () => {
   it("file config supplies outputFile; CLI overrides with --out", () => {
     const fileCfg: Partial<Options> = { outputPath: "C:/repo/from-file.txt" };
     const cli = parseArgs(["node", "script", "--out=C:/tmp/cli.txt"]);
-    const merged = mergeOptions(
-      defaultOptions,
-      fileCfg,
-      cli,
-      "C:/repo",
-      "C:/cwd"
-    );
-    expect(merged.outputPath.replace(/\\/g, "/")).toBe(
-      "C:/tmp/cli.txt".replace(/\\/g, "/")
-    );
+    const merged = mergeOptions(defaultOptions, fileCfg, cli, "C:/repo", "C:/cwd");
+    expect(merged.outputPath.replace(/\\/g, "/")).toBe("C:/tmp/cli.txt".replace(/\\/g, "/"));
   });
 
   it("parseArgs parses other flags and keeps them intact", () => {
@@ -178,7 +164,6 @@ describe("loadPrTemplateText (absolute/relative path branches)", () => {
     const mod = await import("../src/generate-prompt-from-git-diff");
     const txt = await mod.loadPrTemplateText("C:/repo", {
       prTemplateFile: "C:/abs/pull_request_template.md", // Absolute path → branch where isAbsolutePathLike === true
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     expect(txt).toBe("ABS TEMPLATE");
@@ -193,7 +178,6 @@ describe("loadPrTemplateText (absolute/relative path branches)", () => {
     const mod = await import("../src/generate-prompt-from-git-diff");
     const txt = await mod.loadPrTemplateText("C:/repo", {
       prTemplateFile: ".github/pull_request_template.md", // Relative path → branch that uses join(repoRoot, ...)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     expect(txt).toBe("REL TEMPLATE");
