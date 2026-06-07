@@ -8,12 +8,17 @@ on:
 jobs:
   bun-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     strategy:
       matrix:
         bun-version: ["1.1.0", "1.2.0", "aqua"]
 
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Setup toolchain (from aqua/aqua.yaml)
         uses: ./.github/actions/setup-toolchain
@@ -68,6 +73,7 @@ jobs:
     name: Bun test status check
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions: {}
     if: always()
     needs:
       - bun-test
