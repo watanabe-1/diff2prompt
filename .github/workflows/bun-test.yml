@@ -63,3 +63,21 @@ jobs:
 
       - name: Test
         run: bun run test
+
+  status-check:
+    name: Bun test status check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: always()
+    needs:
+      - bun-test
+    steps:
+      - name: Check required job result
+        env:
+          BUN_TEST_RESULT: ${{ needs.bun-test.result }}
+        run: |
+          if [ "$BUN_TEST_RESULT" = "success" ]; then
+            exit 0
+          fi
+          echo "bun-test result: $BUN_TEST_RESULT"
+          exit 1

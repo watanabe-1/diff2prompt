@@ -54,3 +54,21 @@ jobs:
         with:
           name: coverage
           path: coverage
+
+  status-check:
+    name: Node test status check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: always()
+    needs:
+      - node-test
+    steps:
+      - name: Check required job result
+        env:
+          NODE_TEST_RESULT: ${{ needs.node-test.result }}
+        run: |
+          if [ "$NODE_TEST_RESULT" = "success" ]; then
+            exit 0
+          fi
+          echo "node-test result: $NODE_TEST_RESULT"
+          exit 1
