@@ -57,7 +57,7 @@ Please generate **all** of the following based on the diff:
 2) **PR title**: mirror the commit message exactly.
 
 3) **Branch name**:
-   - Lowercase kebab-case, ASCII [a–z0–9-] only.
+   - Lowercase kebab-case, ASCII [a-z0-9-] only.
    - Prefix "<type>/" and include "/<scope>" if used.
    - ≤ 40 chars after the prefix.
 
