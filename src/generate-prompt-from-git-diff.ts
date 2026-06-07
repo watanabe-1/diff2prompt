@@ -79,8 +79,9 @@ export function parseArgs(argv: string[]): Partial<Options> {
   return out;
 }
 
-export async function runGit(cmd: string, opt: Options): Promise<string> {
+export async function runGit(cmd: string, opt: Options, cwd?: string): Promise<string> {
   const { stdout } = (await exec(cmd, {
+    cwd,
     maxBuffer: opt.maxBuffer,
   })) as ExecResult;
 
@@ -157,13 +158,13 @@ export async function collectDiff(opt: Options): Promise<string> {
   const repoRoot = (await getRepoRootSafe()) ?? process.cwd();
 
   const [diffCmd, diffCachedCmd] = await buildDiffCommands(repoRoot, opt);
-  const unstaged = await runGit(diffCmd, opt);
-  const staged = await runGit(diffCachedCmd, opt);
+  const unstaged = await runGit(diffCmd, opt, repoRoot);
+  const staged = await runGit(diffCachedCmd, opt, repoRoot);
   let full = (unstaged + staged).trim();
 
   if (opt.includeUntracked) {
     const untrackedCmd = await buildUntrackedCommand(repoRoot, opt);
-    const filesStdout = await runGit(untrackedCmd, opt);
+    const filesStdout = await runGit(untrackedCmd, opt, repoRoot);
     const files = filesStdout
       .split("\n")
       .map((s) => s.trim())
@@ -172,13 +173,14 @@ export async function collectDiff(opt: Options): Promise<string> {
     if (files.length > 0) {
       full += NEW_FILES_HEADER;
       for (const file of files) {
+        const filePath = join(repoRoot, file);
         try {
-          const st = await stat(file);
+          const st = await stat(filePath);
           if (st.size > opt.maxNewFileSizeBytes) {
             full += `\n${FILE_LABEL}${file}\n${tooLargeSkipped(st.size)}\n`;
             continue;
           }
-          const buf = await readFile(file);
+          const buf = await readFile(filePath);
           if (looksBinary(buf)) {
             full += `\n${FILE_LABEL}${file}\n${binarySkipped(st.size)}\n`;
           } else {
