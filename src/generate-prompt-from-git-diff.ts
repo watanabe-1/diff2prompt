@@ -191,9 +191,10 @@ export async function collectDiff(opt: Options): Promise<string> {
       }
     }
 
-    if (!full.trim()) {
-      throw new Error(ERROR_NO_CHANGES);
-    }
+  }
+
+  if (!full.trim()) {
+    throw new Error(ERROR_NO_CHANGES);
   }
 
   return full;

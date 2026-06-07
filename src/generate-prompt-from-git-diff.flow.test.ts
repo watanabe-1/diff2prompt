@@ -307,6 +307,18 @@ describe("generate.ts flow", () => {
     expect(s).not.toContain("New files (contents)");
   });
 
+  it("collectDiff(): rejects with --no-untracked when staged and unstaged diffs are empty", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("");
+    gitMap.setStaged("");
+    gitMap.setUntracked("a.txt\n");
+
+    const { collectDiff, defaultOptions } = await importSut();
+    await expect(collectDiff({ ...defaultOptions, includeUntracked: false })).rejects.toThrow(
+      "No changes found: neither diffs nor new files.",
+    );
+  });
+
   it("collectDiff(): --max-new-size forces skip", async () => {
     gitMap.setUnstaged("");
     gitMap.setStaged("");
