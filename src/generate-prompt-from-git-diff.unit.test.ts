@@ -27,6 +27,11 @@ vi.mock("fs/promises", () => {
 });
 
 describe("parseArgs", () => {
+  it("keeps PR template embedding enabled by default", () => {
+    expect(defaultOptions.includePrTemplate).toBe(true);
+    expect(parseArgs(["node", "script"])).not.toHaveProperty("includePrTemplate");
+  });
+
   it("parses flags correctly", () => {
     const argv = [
       "node",
@@ -76,11 +81,15 @@ describe("parseArgs", () => {
     expect(p.excludeFile).toBe("ex.txt");
   });
 
-  // --- NEW ---
   it("parses --no-pr-template and --pr-template-file", () => {
     const p = parseArgs(["node", "script", "--no-pr-template", "--pr-template-file=.github/PR.md"]);
     expect(p.includePrTemplate).toBe(false);
     expect(p.prTemplateFile).toBe(".github/PR.md");
+  });
+
+  it("does not expose --include-pr-template because PR templates are included by default", () => {
+    const p = parseArgs(["node", "script", "--include-pr-template"]);
+    expect(p).toEqual({});
   });
 });
 
