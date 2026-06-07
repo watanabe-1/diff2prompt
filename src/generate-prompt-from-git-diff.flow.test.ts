@@ -566,6 +566,48 @@ describe("generate.ts flow", () => {
     expect(out.data).not.toContain("Please generate **all** of the following");
   });
 
+  it("main(): resolves CLI --template-file relative to repo root when cwd is nested", async () => {
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue("/repo/packages/app");
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("DIFF-CLI\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    await vi.doMock("./config", () => ({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
+    }));
+
+    const tpl = "CLI-FILE {{diff}} {{repoRoot}}";
+    fsState.files.set("/repo/.github/prompt.tpl.md", {
+      size: tpl.length,
+      buf: Buffer.from(tpl, "utf8"),
+    });
+
+    try {
+      const { main } = await importSut();
+      process.argv = [
+        "node",
+        "script",
+        "--template-file=.github/prompt.tpl.md",
+        "--out=/repo/OUT.txt",
+      ];
+      await main();
+
+      const fsmod = await import("fs/promises");
+      const readFileMock = fsmod.readFile as unknown as ReturnType<typeof vi.fn>;
+      const readPaths = readFileMock.mock.calls.map((call) => String(call[0]).replace(/\\/g, "/"));
+      expect(readPaths).toContain("/repo/.github/prompt.tpl.md");
+      expect(readPaths).not.toContain(".github/prompt.tpl.md");
+
+      const out = fsState.writes.at(-1)!;
+      expect(out.data).toContain("CLI-FILE DIFF-CLI /repo");
+      expect(out.data).not.toContain("Please generate **all** of the following");
+    } finally {
+      cwdSpy.mockRestore();
+    }
+  });
+
   it("main(): template precedence CLI inline > file > preset > default", async () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("XYZ\n");
