@@ -25,9 +25,11 @@ const gitMap = vi.hoisted(() => ({
 const fsState = vi.hoisted(() => ({
   files: new Map<string, { size: number; buf?: Buffer; err?: Error }>(),
   writes: [] as Array<{ path: string; data: string; enc?: string }>,
+  execCalls: [] as Array<{ cmd: string; opts?: { cwd?: string; maxBuffer?: number } }>,
   reset() {
     this.files.clear();
     this.writes.length = 0;
+    this.execCalls.length = 0;
   },
 }));
 
@@ -166,10 +168,11 @@ vi.mock("child_process", () => {
 
   function exec(
     cmd: string,
-    optionsOrCb?: { maxBuffer?: number } | ExecCb,
+    optionsOrCb?: { cwd?: string; maxBuffer?: number } | ExecCb,
     maybeCb?: ExecCb,
   ): ChildProcess {
     const cb: ExecCb | undefined = typeof optionsOrCb === "function" ? optionsOrCb : maybeCb;
+    if (typeof optionsOrCb !== "function") fsState.execCalls.push({ cmd, opts: optionsOrCb });
 
     const { cbError, stdout, stderr } = coreExecBehavior(cmd);
     cb?.(cbError, stdout, stderr);
@@ -177,8 +180,9 @@ vi.mock("child_process", () => {
     return {} as ChildProcess;
   }
 
-  const custom = (cmd: string, _opts?: { maxBuffer?: number }) =>
+  const custom = (cmd: string, opts?: { cwd?: string; maxBuffer?: number }) =>
     new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      fsState.execCalls.push({ cmd, opts });
       const { promiseReject, stdout, stderr } = coreExecBehavior(cmd);
       if (promiseReject !== null) reject(promiseReject);
       else resolve({ stdout, stderr });
@@ -200,7 +204,7 @@ vi.mock("fs/promises", () => {
   // NOTE: support both Buffer-return (no encoding) and string-return ("utf8")
   const readFile = vi.fn<(path: string, enc?: string) => Promise<unknown>>(
     async (path: string, enc?: string): Promise<unknown> => {
-      const f = fsState.files.get(path);
+      const f = fsState.files.get(path) ?? fsState.files.get(path.replace(/\\/g, "/"));
       if (!f) throw new Error(`ENOENT: ${path}`);
       if (f.err) throw f.err;
       if (!f.buf) throw new Error("No buffer");
@@ -211,7 +215,7 @@ vi.mock("fs/promises", () => {
 
   const stat = vi.fn<(path: string) => Promise<{ size: number }>>(
     async (path: string): Promise<{ size: number }> => {
-      const f = fsState.files.get(path);
+      const f = fsState.files.get(path) ?? fsState.files.get(path.replace(/\\/g, "/"));
       if (!f) throw new Error(`ENOENT: ${path}`);
       if (f.err) throw f.err;
 
@@ -268,10 +272,10 @@ describe("generate.ts flow", () => {
     gitMap.setStaged(""); // only unstaged changes
     gitMap.setUntracked(["a.txt", "b.bin", "huge.txt", "err.txt"].join("\n"));
 
-    fsState.files.set("a.txt", { size: 5, buf: Buffer.from("hello") });
-    fsState.files.set("b.bin", { size: 5, buf: Buffer.from([0x00, 0x10]) }); // binary
-    fsState.files.set("huge.txt", { size: 1_000_001, buf: Buffer.from("x") });
-    fsState.files.set("err.txt", {
+    fsState.files.set("/repo/a.txt", { size: 5, buf: Buffer.from("hello") });
+    fsState.files.set("/repo/b.bin", { size: 5, buf: Buffer.from([0x00, 0x10]) }); // binary
+    fsState.files.set("/repo/huge.txt", { size: 1_000_001, buf: Buffer.from("x") });
+    fsState.files.set("/repo/err.txt", {
       size: 10,
       err: new Error("Permission denied"),
     });
@@ -307,6 +311,48 @@ describe("generate.ts flow", () => {
     expect(s).not.toContain("New files (contents)");
   });
 
+  it("collectDiff(): runs git from repo root and reads untracked files relative to repo root", async () => {
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue("C:/repo/packages/app");
+    gitMap.setRoot("C:/repo\n");
+    gitMap.setUnstaged("");
+    gitMap.setStaged("");
+    gitMap.setUntracked("src/new.txt\n");
+    fsState.files.set("C:/repo/src/new.txt", {
+      size: 7,
+      buf: Buffer.from("created", "utf8"),
+    });
+
+    try {
+      const { collectDiff, defaultOptions } = await importSut();
+      const s = await collectDiff({ ...defaultOptions, includeUntracked: true });
+
+      expect(s).toContain("File: src/new.txt");
+      expect(s).toContain("created");
+
+      const collectGitCalls = fsState.execCalls.filter(
+        ({ cmd }) =>
+          cmd.startsWith("git diff -- ") ||
+          cmd.startsWith("git diff --cached -- ") ||
+          cmd.startsWith("git ls-files --others --exclude-standard -- "),
+      );
+      expect(collectGitCalls.map(({ opts }) => opts?.cwd)).toEqual([
+        "C:/repo",
+        "C:/repo",
+        "C:/repo",
+      ]);
+
+      const fsmod = await import("fs/promises");
+      const statMock = fsmod.stat as unknown as ReturnType<typeof vi.fn>;
+      const readFileMock = fsmod.readFile as unknown as ReturnType<typeof vi.fn>;
+      const normalize = (path: string) => path.replace(/\\/g, "/");
+
+      expect(normalize(statMock.mock.calls.at(-1)?.[0] as string)).toBe("C:/repo/src/new.txt");
+      expect(normalize(readFileMock.mock.calls.at(-1)?.[0] as string)).toBe("C:/repo/src/new.txt");
+    } finally {
+      cwdSpy.mockRestore();
+    }
+  });
+
   it("collectDiff(): rejects with --no-untracked when staged and unstaged diffs are empty", async () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("");
@@ -323,7 +369,8 @@ describe("generate.ts flow", () => {
     gitMap.setUnstaged("");
     gitMap.setStaged("");
     gitMap.setUntracked("tiny.txt\n");
-    fsState.files.set("tiny.txt", { size: 10, buf: Buffer.from("0123456789") });
+    gitMap.setRoot("/repo\n");
+    fsState.files.set("/repo/tiny.txt", { size: 10, buf: Buffer.from("0123456789") });
 
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({
@@ -374,8 +421,9 @@ describe("generate.ts flow", () => {
     gitMap.setUnstaged("");
     gitMap.setStaged("");
     gitMap.setUntracked("weird.txt\n");
+    gitMap.setRoot("/repo\n");
 
-    fsState.files.set("weird.txt", {
+    fsState.files.set("/repo/weird.txt", {
       size: 123,
       // @ts-expect-error force non-Error
       err: "BOOM_STRING_ERROR",
@@ -738,7 +786,7 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked(["dist/a.txt", "src/b.txt", "node_modules/x.js"].join("\n"));
 
-    fsState.files.set("src/b.txt", { size: 3, buf: Buffer.from("hey") });
+    fsState.files.set("/repo/src/b.txt", { size: 3, buf: Buffer.from("hey") });
 
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({
@@ -764,7 +812,7 @@ describe("generate.ts flow", () => {
       buf: Buffer.from(["logs", "*.tmp   # ignored", "   # comment", ""].join("\n"), "utf8"),
     });
 
-    fsState.files.set("src/ok.txt", { size: 2, buf: Buffer.from("ok") });
+    fsState.files.set("/repo/src/ok.txt", { size: 2, buf: Buffer.from("ok") });
 
     const { main } = await importSut();
     process.argv = [
@@ -789,6 +837,7 @@ describe("generate.ts flow", () => {
     gitMap.setUnstaged("");
     gitMap.setStaged("");
     gitMap.setUntracked("keep.txt\n");
+    fsState.files.set("/repo/keep.txt", { size: 4, buf: Buffer.from("keep") });
 
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({
@@ -810,7 +859,7 @@ describe("generate.ts flow", () => {
       size: 16,
       buf: Buffer.from("logs\n", "utf8"),
     });
-    fsState.files.set("src/ok.txt", { size: 2, buf: Buffer.from("ok") });
+    fsState.files.set("/repo/src/ok.txt", { size: 2, buf: Buffer.from("ok") });
 
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({
@@ -830,7 +879,7 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked(["build dir/a.js", "src/ok.txt"].join("\n"));
 
-    fsState.files.set("src/ok.txt", { size: 2, buf: Buffer.from("ok") });
+    fsState.files.set("/repo/src/ok.txt", { size: 2, buf: Buffer.from("ok") });
 
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({
