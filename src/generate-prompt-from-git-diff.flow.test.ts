@@ -846,7 +846,10 @@ describe("generate.ts flow", () => {
 
     fsState.files.set("/repo/.d2p-ex.txt", {
       size: 100,
-      buf: Buffer.from(["logs", "*.tmp   # ignored", "   # comment", ""].join("\n"), "utf8"),
+      buf: Buffer.from(
+        ["logs", "*.tmp   # ignored", "# comment", "   # indented comment", ""].join("\n"),
+        "utf8",
+      ),
     });
 
     fsState.files.set("/repo/src/ok.txt", { size: 2, buf: Buffer.from("ok") });
@@ -867,6 +870,18 @@ describe("generate.ts flow", () => {
     expect(out.data).toContain("ok");
     expect(out.data).not.toContain("File: build/a.js");
     expect(out.data).not.toContain("File: logs/app.log");
+
+    const untrackedCall = fsState.execCalls.find(
+      ({ file, args }) =>
+        file === "git" &&
+        args[0] === "ls-files" &&
+        args[1] === "--others" &&
+        args[2] === "--exclude-standard",
+    );
+    expect(untrackedCall?.args).toContain(":(exclude)logs");
+    expect(untrackedCall?.args).toContain(":(exclude)*.tmp");
+    expect(untrackedCall?.args).not.toContain(":(exclude)# comment");
+    expect(untrackedCall?.args).not.toContain(":(exclude)# indented comment");
   });
 
   it("collectDiff(): excludeFile (relative) missing -> readLinesIfExists returns [] and no filtering (patterns.size===0)", async () => {
