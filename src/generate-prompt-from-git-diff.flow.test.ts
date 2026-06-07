@@ -256,6 +256,32 @@ describe("generate.ts flow", () => {
     process.env = { ...origEnv };
   });
 
+  it("parseArgs(): keeps '=' inside flag values", async () => {
+    const { parseArgs } = await importSut();
+
+    const parsed = parseArgs([
+      "node",
+      "script",
+      "--lines=10",
+      "--out=tmp/a=b.txt",
+      "--max-new-size=123",
+      "--max-buffer=456",
+      "--template-file=.github/prompt=a.tpl.md",
+      "--pr-template-file=.github/pr=a.tpl.md",
+      "--template-preset=custom=a",
+      "--exclude-file=.d2p=a.txt",
+    ]);
+
+    expect(parsed.maxConsoleLines).toBe(10);
+    expect(parsed.outputPath).toBe("tmp/a=b.txt");
+    expect(parsed.maxNewFileSizeBytes).toBe(123);
+    expect(parsed.maxBuffer).toBe(456);
+    expect(parsed.promptTemplateFile).toBe(".github/prompt=a.tpl.md");
+    expect(parsed.prTemplateFile).toBe(".github/pr=a.tpl.md");
+    expect(parsed.templatePreset).toBe("custom=a");
+    expect(parsed.excludeFile).toBe(".d2p=a.txt");
+  });
+
   it("main(): diff + untracked (text/binary/huge/error), truncated preview, writes file", async () => {
     const diff = "diff --git a/x b/x\n@@\n-1\n+2\n";
     gitMap.setRoot("/repo\n");
