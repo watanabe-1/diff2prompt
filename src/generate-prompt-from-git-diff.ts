@@ -110,6 +110,7 @@ async function readLinesIfExists(path: string): Promise<string[]> {
   return txt
     .split(/\r?\n/g)
     .map((s) => s.replace(/\s+#.*$/, "").trim())
+    .filter((s) => !s.startsWith("#"))
     .filter(Boolean);
 }
 
