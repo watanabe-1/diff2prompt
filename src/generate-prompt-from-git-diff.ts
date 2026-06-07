@@ -3,7 +3,7 @@ import { readFile, writeFile, stat } from "fs/promises";
 import { join } from "path";
 import { promisify } from "util";
 
-import { getRepoRootSafe, loadUserConfig } from "./config";
+import { getRepoRootSafe, loadUserConfig, mergeOptions } from "./config";
 import {
   MAX_CONSOLE_LINES_DEFAULT,
   MAX_NEWFILE_SIZE_BYTES,
@@ -14,7 +14,6 @@ import {
   NEW_FILES_HEADER,
   PREVIEW_HEADER,
   TRUNCATED_LINE,
-  DEFAULT_OUTPUT_FILENAME,
 } from "./constants";
 import { tooLargeSkipped, binarySkipped, readError } from "./strings";
 
@@ -243,15 +242,7 @@ export async function main() {
   const fileCfg = await loadUserConfig(repoRoot);
   const cli = parseArgs(process.argv);
 
-  const merged: Options = {
-    ...defaultOptions,
-    ...fileCfg,
-    ...cli,
-  };
-
-  if (!merged.outputPath) {
-    merged.outputPath = join(repoRoot || __DIRNAME_SAFE, DEFAULT_OUTPUT_FILENAME);
-  }
+  const merged = mergeOptions(defaultOptions, fileCfg, cli, repoRoot || null, __DIRNAME_SAFE);
 
   try {
     // Validate git repo (leave constant in use)

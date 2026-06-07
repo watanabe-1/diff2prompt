@@ -230,6 +230,14 @@ function mockExit() {
   return { restore: () => void (process.exit = original) };
 }
 
+async function mockConfig(overrides: Record<string, unknown>) {
+  await vi.doMock("./config", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("./config")>();
+
+    return { ...actual, ...overrides };
+  });
+}
+
 describe("generate.ts flow", () => {
   const origArgv = process.argv.slice();
   const origEnv = { ...process.env };
@@ -473,10 +481,10 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked("");
 
-    await vi.doMock("./config", () => ({
+    await mockConfig({
       getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
       loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
-    }));
+    });
 
     const joinSpy: any = vi.fn<(a: string, b: string) => string>(
       (a: string, b: string) => `${a}/${b}`,
@@ -508,10 +516,10 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     // Return an empty string for repoRoot → falsy → falls back to __DIRNAME_SAFE
-    await vi.doMock("./config", () => ({
+    await mockConfig({
       getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue(""),
       loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
-    }));
+    });
 
     // Spy join to inspect calls; mock keeps signature join(a, b)
     const joinSpy: any = vi.fn<(a: string, b: string) => string>(
@@ -551,18 +559,64 @@ describe("generate.ts flow", () => {
     expect(lastWrite.path.endsWith("generated-prompt.txt")).toBe(true);
   });
 
+  it("main(): whitespace-only --out falls back to default output path", async () => {
+    vi.resetModules();
+
+    gitMap.reset();
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("DIFF\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    await mockConfig({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
+    });
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--out=   "];
+    await main();
+
+    const lastWrite = fsState.writes.at(-1)!;
+    expect(lastWrite.path.replace(/\\/g, "/")).toBe("/repo/generated-prompt.txt");
+  });
+
+  it("main(): whitespace-only config outputPath falls back to default output path", async () => {
+    vi.resetModules();
+
+    gitMap.reset();
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("DIFF\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    await mockConfig({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
+        outputPath: "   ",
+      }),
+    });
+
+    const { main } = await importSut();
+    process.argv = ["node", "script"];
+    await main();
+
+    const lastWrite = fsState.writes.at(-1)!;
+    expect(lastWrite.path.replace(/\\/g, "/")).toBe("/repo/generated-prompt.txt");
+  });
+
   it("main(): uses promptTemplateFile and replaces {{diff}}, {{now}}, {{repoRoot}}", async () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("DIFF-A\n");
     gitMap.setStaged("");
     gitMap.setUntracked("");
 
-    await vi.doMock("./config", () => ({
+    await mockConfig({
       getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
       loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
         promptTemplateFile: "/repo/.github/prompt.tpl.md",
       }),
-    }));
+    });
 
     const tpl = [
       "# Custom Prompt",
@@ -599,10 +653,10 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked("");
 
-    await vi.doMock("./config", () => ({
+    await mockConfig({
       getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
       loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
-    }));
+    });
 
     const tpl = "CLI-FILE {{diff}} {{repoRoot}}";
     fsState.files.set("/repo/.github/prompt.tpl.md", {
@@ -640,13 +694,13 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked("");
 
-    await vi.doMock("./config", () => ({
+    await mockConfig({
       getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
       loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
         promptTemplateFile: "/repo/tpl.md",
         templatePreset: "minimal",
       }),
-    }));
+    });
 
     const fileTpl = "FILE-TPL {{diff}}";
     fsState.files.set("/repo/tpl.md", {
@@ -675,12 +729,12 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked("");
 
-    await vi.doMock("./config", () => ({
+    await mockConfig({
       getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
       loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
         templatePreset: "minimal",
       }),
-    }));
+    });
 
     const { main } = await importSut();
     process.argv = ["node", "script", "--out=/repo/PRESET.txt"];
@@ -698,10 +752,10 @@ describe("generate.ts flow", () => {
     gitMap.setUntracked("");
 
     // default preset via empty config; PR template auto-discovery
-    await vi.doMock("./config", () => ({
+    await mockConfig({
       getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
       loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
-    }));
+    });
 
     const pr = ["# Pull Request Template", "", "## 📝 Overview", "- What was done"].join("\n");
 
@@ -728,12 +782,12 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked("");
 
-    await vi.doMock("./config", () => ({
+    await mockConfig({
       getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
       loadUserConfig: vi
         .fn<() => Promise<Record<string, unknown>>>()
         .mockResolvedValue({ templatePreset: "default" }),
-    }));
+    });
 
     const pr = "## Custom PR\n- item";
     fsState.files.set("/repo/PR.md", {
@@ -763,12 +817,12 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked("");
 
-    await vi.doMock("./config", () => ({
+    await mockConfig({
       getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
       loadUserConfig: vi
         .fn<() => Promise<Record<string, unknown>>>()
         .mockResolvedValue({ templatePreset: "default" }),
-    }));
+    });
 
     const pr = "PR CONTENT";
     fsState.files.set("/repo/.github/pull_request_template.md", {
@@ -793,13 +847,13 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked("");
 
-    await vi.doMock("./config", () => ({
+    await mockConfig({
       getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
       loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
         includePrTemplate: false,
         templatePreset: "default",
       }),
-    }));
+    });
 
     fsState.files.set("/repo/.github/pull_request_template.md", {
       size: 10,
@@ -821,12 +875,12 @@ describe("generate.ts flow", () => {
     gitMap.setStaged("");
     gitMap.setUntracked("");
 
-    await vi.doMock("./config", () => ({
+    await mockConfig({
       getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
       loadUserConfig: vi
         .fn<() => Promise<Record<string, unknown>>>()
         .mockResolvedValue({ templatePreset: "minimal" }),
-    }));
+    });
 
     // Even if a PR template exists, the minimal preset does not include a section heading
     fsState.files.set("/repo/.github/pull_request_template.md", {

@@ -107,6 +107,26 @@ describe("merge behavior (defaults -> file -> cli)", () => {
     expect(merged.outputPath.endsWith("generated-prompt.txt")).toBe(true);
   });
 
+  it("uses default filename when outputPath is whitespace only", () => {
+    const mergedFromConfig = mergeOptions(
+      defaultOptions,
+      { outputPath: "   " },
+      {},
+      "C:/repo",
+      "C:/cwd",
+    );
+    const mergedFromCli = mergeOptions(
+      defaultOptions,
+      { outputPath: "C:/repo/from-file.txt" },
+      { outputPath: "   " },
+      "C:/repo",
+      "C:/cwd",
+    );
+
+    expect(mergedFromConfig.outputPath.replace(/\\/g, "/")).toBe("C:/repo/generated-prompt.txt");
+    expect(mergedFromCli.outputPath.replace(/\\/g, "/")).toBe("C:/repo/generated-prompt.txt");
+  });
+
   it("file config supplies outputFile; CLI overrides with --out", () => {
     const fileCfg: Partial<Options> = { outputPath: "C:/repo/from-file.txt" };
     const cli = parseArgs(["node", "script", "--out=C:/tmp/cli.txt"]);
