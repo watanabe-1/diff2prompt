@@ -1,0 +1,53 @@
+name: Renovate
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  renovate:
+    # workflow_dispatch allows selecting any branch, so restrict to main
+    if: github.ref == 'refs/heads/main'
+    name: renovate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: renovate
+    permissions:
+      contents: read
+    steps:
+      - name: Create github app token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: renovate-app-token
+        with:
+          client-id: ${{ secrets.RENOVATE_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_PRIVATE_KEY }}
+          permission-administration: read
+          permission-checks: write
+          permission-statuses: write
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+          permission-workflows: write
+          permission-members: read
+          permission-vulnerability-alerts: read
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run Renovate
+        uses: renovatebot/github-action@693b9ef15eec82123529a37c782242f091365961 # v46.1.14
+        env:
+          LOG_LEVEL: info
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+        with:
+          token: ${{ steps.renovate-app-token.outputs.token }}
+          configurationFile: .github/renovate.json

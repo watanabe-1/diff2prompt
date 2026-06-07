@@ -9,7 +9,7 @@
 *.tsx         text eol=lf
 *.txt         text eol=lf
 *.yml         text eol=lf
+*.yaml        text eol=lf
 *.lock        text eol=lf
 .code-workspace text eol=lf
 .gitignore    text eol=lf
-.tool-versions    text eol=lf

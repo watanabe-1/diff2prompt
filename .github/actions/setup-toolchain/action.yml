@@ -1,0 +1,112 @@
+name: Setup Toolchain
+description: Resolve Node.js/Bun versions from aqua/aqua.yaml, optionally set up aqua, and optionally restore the Bun package cache.
+
+inputs:
+  setup-aqua:
+    description: Install the aqua CLI so later steps can run tools from aqua/aqua.yaml.
+    required: false
+    default: "false"
+  node-version:
+    description: Node.js version to install. Use `aqua` to resolve from aqua/aqua.yaml. Leave empty to skip Node.js setup.
+    required: false
+    default: ""
+  bun-version:
+    description: Bun version to install. Use `aqua` to resolve from aqua/aqua.yaml. Leave empty to skip Bun setup.
+    required: false
+    default: ""
+  registry-url:
+    description: Optional npm registry URL passed to actions/setup-node.
+    required: false
+    default: ""
+  bun-cache:
+    description: Restore the Bun package cache from ~/.bun/install/cache.
+    required: false
+    default: "false"
+
+outputs:
+  node-version:
+    description: Resolved Node.js version.
+    value: ${{ steps.resolve.outputs.node-version }}
+  bun-version:
+    description: Resolved Bun version.
+    value: ${{ steps.resolve.outputs.bun-version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup aqua
+      if: ${{ inputs.setup-aqua == 'true' }}
+      uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
+      with:
+        aqua_version: v2.59.0
+      env:
+        AQUA_GITHUB_TOKEN: ${{ github.token }}
+
+    - name: Resolve runtime versions
+      id: resolve
+      shell: bash
+      env:
+        INPUT_NODE_VERSION: ${{ inputs.node-version }}
+        INPUT_BUN_VERSION: ${{ inputs.bun-version }}
+      run: |
+        set -euo pipefail
+
+        parse_aqua_node_version() {
+          sed -nE 's/^[[:space:]]*-[[:space:]]name:[[:space:]]nodejs\/node@v?([0-9]+(\.[0-9]+)*)([[:space:]]+#.*)?[[:space:]]*$/\1/p' aqua/aqua.yaml | head -n1
+        }
+
+        parse_aqua_bun_version() {
+          sed -nE 's/^[[:space:]]*-[[:space:]]name:[[:space:]]oven-sh\/bun@(bun-v|v)?([0-9]+(\.[0-9]+)*)([[:space:]]+#.*)?[[:space:]]*$/\2/p' aqua/aqua.yaml | head -n1
+        }
+
+        NODE_INPUT="$INPUT_NODE_VERSION"
+        BUN_INPUT="$INPUT_BUN_VERSION"
+
+        if [ "$NODE_INPUT" = "aqua" ]; then
+          NODE_VERSION="$(parse_aqua_node_version)"
+          if [ -z "$NODE_VERSION" ]; then
+            echo "Failed to parse nodejs/node from aqua/aqua.yaml"
+            exit 1
+          fi
+        else
+          NODE_VERSION="$NODE_INPUT"
+        fi
+
+        if [ "$BUN_INPUT" = "aqua" ]; then
+          BUN_VERSION="$(parse_aqua_bun_version)"
+          if [ -z "$BUN_VERSION" ]; then
+            echo "Failed to parse oven-sh/bun from aqua/aqua.yaml"
+            exit 1
+          fi
+        else
+          BUN_VERSION="$BUN_INPUT"
+        fi
+
+        echo "node-version=$NODE_VERSION" >> "$GITHUB_OUTPUT"
+        echo "bun-version=$BUN_VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Node.js
+      if: ${{ inputs.node-version != '' && inputs.registry-url == '' }}
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      with:
+        node-version: ${{ steps.resolve.outputs.node-version }}
+
+    - name: Setup Node.js with registry
+      if: ${{ inputs.node-version != '' && inputs.registry-url != '' }}
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      with:
+        node-version: ${{ steps.resolve.outputs.node-version }}
+        registry-url: ${{ inputs.registry-url }}
+
+    - name: Setup Bun
+      if: ${{ inputs.bun-version != '' }}
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      with:
+        bun-version: ${{ steps.resolve.outputs.bun-version }}
+
+    - name: Restore Bun package cache
+      if: ${{ inputs.bun-cache == 'true' }}
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: ~/.bun/install/cache
+        key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
