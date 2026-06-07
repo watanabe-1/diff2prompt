@@ -5,13 +5,14 @@ on:
     tags:
       - "v*.*.*"
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   check-tag:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     outputs:
       not_on_main: ${{ steps.check.outputs.not_on_main }}
     steps:
@@ -19,6 +20,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Fetch main branch
         run: git fetch origin main
@@ -34,7 +36,7 @@ jobs:
           fi
           tag_commit=$(git rev-list -n 1 "$TAG_REF")
           main_commit=$(git rev-parse origin/main)
-          base_commit=$(git merge-base $tag_commit $main_commit)
+          base_commit=$(git merge-base "$tag_commit" "$main_commit")
           if [ "$base_commit" != "$tag_commit" ]; then
             echo "not_on_main=true" >> "$GITHUB_OUTPUT"
           else
@@ -45,12 +47,17 @@ jobs:
     needs: check-tag
     if: needs.check-tag.outputs.not_on_main == 'false'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup toolchain
         uses: ./.github/actions/setup-toolchain
@@ -80,20 +87,26 @@ jobs:
           git config --global user.email "github-actions@github.com"
 
       - name: Bump version
+        env:
+          VERSION: ${{ steps.extract_version.outputs.version }}
         run: |
-          npm version "${{ steps.extract_version.outputs.version }}" --no-git-tag-version
+          npm version "$VERSION" --no-git-tag-version
           git add package.json
 
       - name: Get previous tag
         id: previous_tag
+        env:
+          VERSION: ${{ steps.extract_version.outputs.version }}
         run: |
-          prev_tag=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^v${{ steps.extract_version.outputs.version }}$" | head -n 1)
+          prev_tag=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^v${VERSION}$" | head -n 1)
           echo "tag=$prev_tag" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog
         id: changelog
+        env:
+          PREVIOUS_TAG: ${{ steps.previous_tag.outputs.tag }}
         run: |
-          changelog=$(git log ${{ steps.previous_tag.outputs.tag }}..HEAD --pretty=format:"- %s" | grep -v 'chore: bump version')
+          changelog=$(git log "${PREVIOUS_TAG}..HEAD" --pretty=format:"- %s" | grep -v 'chore: bump version')
           {
             echo "changelog<<EOF"
             echo "$changelog"

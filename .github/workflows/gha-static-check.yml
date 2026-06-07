@@ -1,0 +1,191 @@
+name: GHA static checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      checks: write # Required to publish actionlint results as GitHub Checks annotations.
+      pull-requests: write # Required to publish actionlint results as PR review comments.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
+        with:
+          setup-aqua: "true"
+
+      - name: Install required tools lazily
+        shell: bash
+        run: |
+          actionlint -version
+          reviewdog -version
+
+      - name: Run actionlint via reviewdog
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          echo "GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
+
+          reporter="github-check"
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            reporter="github-pr-review"
+          fi
+          echo "reviewdog reporter=${reporter}"
+
+          actionlint -oneline \
+            | reviewdog \
+                -efm="%f:%l:%c: %m" \
+                -name=actionlint \
+                -reporter="${reporter}" \
+                -filter-mode=nofilter \
+                -fail-level=any
+
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read # Required so zizmor can read workflow/action metadata during analysis.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # Intentionally use the official zizmor action (not aqua):
+      # its release notes state Docker image use is "fully hash-checked internally".
+      # See: https://github.com/zizmorcore/zizmor-action/releases/tag/v0.4.0
+      - name: Run zizmor (no Advanced Security)
+        uses: zizmorcore/zizmor-action@5f14fd08f7cf1cb1609c1e344975f152c7ee938d # v0.5.6
+        with:
+          advanced-security: false
+          annotations: true
+
+  ghalint:
+    name: ghalint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      AQUA_GLOBAL_CONFIG: ${{ github.workspace }}/aqua/aqua.yaml
+      AQUA_POLICY_CONFIG: ${{ github.workspace }}/aqua/aqua-policy.yaml
+    permissions:
+      contents: read
+      pull-requests: write # Required to create/update PR comments.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
+        with:
+          setup-aqua: "true"
+
+      - name: Install required tools lazily
+        shell: bash
+        run: |
+          ghalint -v
+
+      - name: Run ghalint
+        id: run-ghalint
+        shell: bash
+        env:
+          GHALINT_LOG_COLOR: always
+        run: |
+          set +e
+          ghalint run 2>&1 | tee ghalint.log
+          ghalint_status=${PIPESTATUS[0]}
+          set -e
+          echo "status=$ghalint_status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Create ghalint comment body
+        if: github.event_name == 'pull_request' && steps.run-ghalint.outputs.status != '0'
+        shell: bash
+        run: |
+          formatted_file="$(mktemp)"
+          sed -E 's/\x1B\[[0-9;]*[mK]//g' ghalint.log | awk '
+            /workflow_file_path=/ {
+              workflow = policy = reference = job = err = ""
+              if (match($0, /workflow_file_path=([^ ]+)/, m)) workflow = m[1]
+              if (match($0, /policy_name=([^ ]+)/, m)) policy = m[1]
+              if (match($0, /reference=([^ ]+)/, m)) reference = m[1]
+              if (match($0, /job_name=([^ ]+)/, m)) job = m[1]
+              if (match($0, /error="([^"]+)"/, m)) err = m[1]
+              print "- workflow: " workflow
+              print "  policy: " policy
+              print "  job: " job
+              print "  error: " err
+              print "  reference: " reference
+              print ""
+            }
+          ' > "$formatted_file"
+
+          {
+            echo "<!-- ghalint-report -->"
+            echo "## ghalint violations"
+            echo
+            if [ -s "$formatted_file" ]; then
+              cat "$formatted_file"
+            else
+              echo "ghalint failed, but no violation lines were parsed."
+            fi
+          } > comment.txt
+
+      - name: Post ghalint comment on PR
+        if: github.event_name == 'pull_request' && steps.run-ghalint.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.number }}
+        shell: bash
+        run: gh pr comment "$PR_NUMBER" --edit-last --create-if-none --body-file comment.txt
+
+      - name: Fail if ghalint found violations
+        if: steps.run-ghalint.outputs.status != '0'
+        shell: bash
+        run: exit 1
+
+  status-check:
+    name: GHA static checks status check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: always()
+    needs:
+      - actionlint
+      - zizmor
+      - ghalint
+    steps:
+      - name: Check required job results
+        env:
+          ACTIONLINT_RESULT: ${{ needs.actionlint.result }}
+          ZIZMOR_RESULT: ${{ needs.zizmor.result }}
+          GHALINT_RESULT: ${{ needs.ghalint.result }}
+        run: |
+          if [ "$ACTIONLINT_RESULT" = "success" ] && [ "$ZIZMOR_RESULT" = "success" ] && [ "$GHALINT_RESULT" = "success" ]; then
+            exit 0
+          fi
+          echo "actionlint result: $ACTIONLINT_RESULT"
+          echo "zizmor result: $ZIZMOR_RESULT"
+          echo "ghalint result: $GHALINT_RESULT"
+          exit 1
