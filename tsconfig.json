@@ -3,8 +3,6 @@
     "target": "ES2022",
     "module": "commonjs",
     "rootDir": "./src/",
-    "declaration": true,
-    "emitDeclarationOnly": false,
     "sourceMap": false,
     "outDir": "./dist",
     "esModuleInterop": true,
