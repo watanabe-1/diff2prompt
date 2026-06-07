@@ -12,13 +12,12 @@ const baseOptions: BuildOptions = {
   tsconfig: "tsconfig.build.json",
 };
 
-const externals = [...Object.keys(pkg.dependencies), ...Object.keys(pkg.peerDependencies)];
 await build({
   ...baseOptions,
   entryPoints: ["src/index.ts"],
   platform: "node",
   bundle: true,
-  external: externals,
+  external: Object.keys(pkg.dependencies),
   banner: {
     js: "#!/usr/bin/env node",
   },

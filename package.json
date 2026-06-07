@@ -1,6 +1,7 @@
 {
   "name": "diff2prompt",
   "version": "0.0.11",
+  "description": "CLI tool for turning Git diffs into AI-ready prompts",
   "keywords": [
     "cli",
     "typescript"
@@ -47,8 +48,5 @@
     "oxlint": "^1.67.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
   }
 }
