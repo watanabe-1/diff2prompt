@@ -81,13 +81,49 @@ export async function getRepoRootSafe(): Promise<string | null> {
 }
 
 export async function readJsonIfExists(path: string): Promise<unknown | null> {
+  let buf: string;
   try {
-    const buf = await readFile(path, "utf8");
-
-    return JSON.parse(buf) as unknown;
-  } catch {
-    return null;
+    buf = await readFile(path, "utf8");
+  } catch (err) {
+    if (isFileNotFoundError(err)) return null;
+    throw configReadError(path, err);
   }
+
+  return parseJsonConfig(path, buf);
+}
+
+export async function readJsonRequired(path: string): Promise<unknown> {
+  let buf: string;
+  try {
+    buf = await readFile(path, "utf8");
+  } catch (err) {
+    throw configReadError(path, err);
+  }
+
+  return parseJsonConfig(path, buf);
+}
+
+function parseJsonConfig(path: string, buf: string): unknown {
+  try {
+    return JSON.parse(buf) as unknown;
+  } catch (err) {
+    throw new Error(`Failed to parse config file at ${path}: ${errorMessage(err)}`);
+  }
+}
+
+function isFileNotFoundError(err: unknown): boolean {
+  return (
+    (isRecord(err) && err["code"] === "ENOENT") ||
+    (err instanceof Error && err.message.startsWith("ENOENT"))
+  );
+}
+
+function configReadError(path: string, err: unknown): Error {
+  return new Error(`Failed to read config file at ${path}: ${errorMessage(err)}`);
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -192,8 +228,9 @@ export function normalizeUserConfig(cfgRaw: unknown, baseDir: string): Partial<O
 export async function loadUserConfig(baseDir: string): Promise<Partial<Options>> {
   // 1) Explicit path via environment variable
   if (process.env.DIFF2PROMPT_CONFIG) {
-    const cfg = await readJsonIfExists(process.env.DIFF2PROMPT_CONFIG);
-    if (cfg) return normalizeUserConfig(cfg, baseDir);
+    const cfg = await readJsonRequired(process.env.DIFF2PROMPT_CONFIG);
+
+    return normalizeUserConfig(cfg, baseDir);
   }
 
   // 2) Default config files
