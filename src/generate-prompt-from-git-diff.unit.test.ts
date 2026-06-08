@@ -52,6 +52,18 @@ describe("parseArgs", () => {
     expect(p.maxBuffer).toBe(999);
   });
 
+  it("rejects invalid numeric flags", () => {
+    expect(() => parseArgs(["node", "script", "--lines=abc"])).toThrow(
+      "Invalid value for --lines: expected a positive integer",
+    );
+    expect(() => parseArgs(["node", "script", "--max-new-size=-1"])).toThrow(
+      "Invalid value for --max-new-size: expected a positive integer",
+    );
+    expect(() => parseArgs(["node", "script", "--max-buffer=0"])).toThrow(
+      "Invalid value for --max-buffer: expected a positive integer",
+    );
+  });
+
   it("returns empty when no flags", () => {
     const p = parseArgs(["node", "script"]);
     expect(p).toEqual({});

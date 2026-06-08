@@ -15,6 +15,7 @@ import {
   PREVIEW_HEADER,
   TRUNCATED_LINE,
 } from "./constants";
+import { parseCliPositiveInteger } from "./number-options";
 import { tooLargeSkipped, binarySkipped, readError } from "./strings";
 
 const execFile = promisify(cpExecFile);
@@ -56,12 +57,17 @@ export function parseArgs(argv: string[]): Partial<Options> {
   const excludes: string[] = [];
 
   for (const a of argv.slice(2)) {
-    if (a.startsWith("--lines=")) out.maxConsoleLines = Number(a.slice("--lines=".length));
+    if (a.startsWith("--lines="))
+      out.maxConsoleLines = parseCliPositiveInteger("--lines", a.slice("--lines=".length));
     else if (a === "--no-untracked") out.includeUntracked = false;
     else if (a.startsWith("--out=")) out.outputPath = a.slice("--out=".length);
     else if (a.startsWith("--max-new-size="))
-      out.maxNewFileSizeBytes = Number(a.slice("--max-new-size=".length));
-    else if (a.startsWith("--max-buffer=")) out.maxBuffer = Number(a.slice("--max-buffer=".length));
+      out.maxNewFileSizeBytes = parseCliPositiveInteger(
+        "--max-new-size",
+        a.slice("--max-new-size=".length),
+      );
+    else if (a.startsWith("--max-buffer="))
+      out.maxBuffer = parseCliPositiveInteger("--max-buffer", a.slice("--max-buffer=".length));
     else if (a.startsWith("--template-file="))
       out.promptTemplateFile = a.slice("--template-file=".length);
     else if (a.startsWith("--template=")) out.promptTemplate = a.slice("--template=".length);
@@ -238,13 +244,12 @@ export async function loadPrTemplateText(repoRoot: string, opt: Options): Promis
 }
 
 export async function main() {
-  const repoRoot = (await getRepoRootSafe()) ?? process.cwd();
-  const fileCfg = await loadUserConfig(repoRoot);
-  const cli = parseArgs(process.argv);
-
-  const merged = mergeOptions(defaultOptions, fileCfg, cli, repoRoot || null, __DIRNAME_SAFE);
-
   try {
+    const cli = parseArgs(process.argv);
+    const repoRoot = (await getRepoRootSafe()) ?? process.cwd();
+    const fileCfg = await loadUserConfig(repoRoot);
+    const merged = mergeOptions(defaultOptions, fileCfg, cli, repoRoot || null, __DIRNAME_SAFE);
+
     // Validate git repo (leave constant in use)
     await runGit(["rev-parse", "--show-toplevel"], merged);
 
