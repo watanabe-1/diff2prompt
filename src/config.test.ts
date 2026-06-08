@@ -101,6 +101,10 @@ function putFile(path: string, json: unknown) {
   mockFiles.set(norm(path), JSON.stringify(json));
 }
 
+function putRawFile(path: string, data: string) {
+  mockFiles.set(norm(path), data);
+}
+
 function rec(v: unknown): Record<string, unknown> {
   return v as Record<string, unknown>;
 }
@@ -144,6 +148,19 @@ describe("config loader & merge", () => {
 
     const cfg = await loadUserConfig("C:/repo");
     expect(cfg.outputPath?.endsWith("env.json.txt")).toBe(true);
+  });
+
+  it("loadUserConfig: rejects when env config path does not exist", async () => {
+    process.env.DIFF2PROMPT_CONFIG = "C:/custom/missing.json";
+
+    await expect(loadUserConfig("C:/repo")).rejects.toThrow("C:/custom/missing.json");
+  });
+
+  it("loadUserConfig: rejects when env config contains invalid JSON", async () => {
+    process.env.DIFF2PROMPT_CONFIG = "C:/custom/broken.json";
+    putRawFile("C:/custom/broken.json", "{ not json");
+
+    await expect(loadUserConfig("C:/repo")).rejects.toThrow("C:/custom/broken.json");
   });
 
   it("loadUserConfig: falls through to diff2prompt.config.json, then .diff2promptrc, then package.json", async () => {
