@@ -113,6 +113,22 @@ export async function readTextFileIfExists(path: string): Promise<string | null>
   }
 }
 
+async function readRequiredTextFile(path: string, label: string): Promise<string> {
+  let txt: string;
+  try {
+    txt = String(await readFile(path, "utf8"));
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`Failed to read ${label} file: ${path}: ${msg}`);
+  }
+
+  if (!txt.trim()) {
+    throw new Error(`${label} file is empty: ${path}`);
+  }
+
+  return txt;
+}
+
 /** Read lines from a file, trim, drop comments (# ...) and blanks. */
 async function readLinesIfExists(path: string): Promise<string[]> {
   const txt = await readTextFileIfExists(path);
@@ -241,8 +257,8 @@ export async function loadPrTemplateText(repoRoot: string, opt: Options): Promis
   // 1) Explicit path if provided
   if (opt.prTemplateFile) {
     const p = resolveRepoPath(repoRoot, opt.prTemplateFile);
-    const txt = await readTextFileIfExists(p);
-    if (txt && txt.trim()) return txt;
+
+    return await readRequiredTextFile(p, "PR template");
   }
   // 2) Common defaults (first match wins)
   const candidates = [
@@ -281,8 +297,7 @@ export async function main() {
     } else if (merged.promptTemplateFile) {
       // 2) Template file
       const templatePath = resolveRepoPath(repoRoot, merged.promptTemplateFile);
-      const txt = await readTextFileIfExists(templatePath);
-      templateText = txt?.trim();
+      templateText = (await readRequiredTextFile(templatePath, "prompt template")).trim();
     }
 
     // 3) Preset or 4) Default

@@ -793,6 +793,43 @@ describe("generate.ts flow", () => {
     }
   });
 
+  it("main(): exits(1) when explicit --template-file is missing", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("DIFF-MISSING-TEMPLATE\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--template-file=missing.md", "--out=/repo/OUT.txt"];
+
+    await expect(main()).rejects.toThrow("process.exit(1)");
+
+    const errOut = errSpy.mock.calls.flat().join("\n");
+    expect(errOut).toContain("missing.md");
+    expect(fsState.writes).toEqual([]);
+  });
+
+  it("main(): exits(1) when explicit --template-file is blank", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("DIFF-BLANK-TEMPLATE\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    fsState.files.set("/repo/empty.md", {
+      size: 4,
+      buf: Buffer.from(" \n\t ", "utf8"),
+    });
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--template-file=empty.md", "--out=/repo/OUT.txt"];
+
+    await expect(main()).rejects.toThrow("process.exit(1)");
+
+    const errOut = errSpy.mock.calls.flat().join("\n");
+    expect(errOut).toContain("empty.md");
+    expect(fsState.writes).toEqual([]);
+  });
+
   it("main(): template precedence CLI inline > file > preset > default", async () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("XYZ\n");
@@ -826,6 +863,39 @@ describe("generate.ts flow", () => {
     expect(out.data).toContain("INLINE-TPL XYZ /repo");
     expect(out.data).not.toContain("FILE-TPL");
     expect(out.data).not.toContain("Please generate **all** of the following");
+  });
+
+  it("main(): inline --template wins over a broken config promptTemplateFile", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("INLINE-DIFF\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    await mockConfig({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
+        promptTemplateFile: "/repo/broken-template.md",
+      }),
+    });
+
+    const { main } = await importSut();
+    const fsmod = await import("fs/promises");
+    const readFileMock = fsmod.readFile as unknown as ReturnType<typeof vi.fn>;
+    readFileMock.mockClear();
+
+    process.argv = [
+      "node",
+      "script",
+      "--template=INLINE-TPL {{diff}} {{repoRoot}}",
+      "--out=/repo/O.txt",
+    ];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.data).toContain("INLINE-TPL INLINE-DIFF /repo");
+
+    const readPaths = readFileMock.mock.calls.map((call) => String(call[0]).replace(/\\/g, "/"));
+    expect(readPaths).not.toContain("/repo/broken-template.md");
   });
 
   it("main(): falls back to preset when no file/inline provided", async () => {
@@ -916,6 +986,58 @@ describe("generate.ts flow", () => {
     expect(out.data).toContain("- item");
   });
 
+  it("main(): exits(1) when explicit --pr-template-file is missing", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("DIFF-MISSING-PR-TEMPLATE\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--out=/repo/OUT.txt", "--pr-template-file=missing.md"];
+
+    await expect(main()).rejects.toThrow("process.exit(1)");
+
+    const errOut = errSpy.mock.calls.flat().join("\n");
+    expect(errOut).toContain("missing.md");
+    expect(fsState.writes).toEqual([]);
+  });
+
+  it("main(): exits(1) when explicit --pr-template-file is blank", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("DIFF-BLANK-PR-TEMPLATE\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    fsState.files.set("/repo/empty.md", {
+      size: 4,
+      buf: Buffer.from(" \n\t ", "utf8"),
+    });
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--out=/repo/OUT.txt", "--pr-template-file=empty.md"];
+
+    await expect(main()).rejects.toThrow("process.exit(1)");
+
+    const errOut = errSpy.mock.calls.flat().join("\n");
+    expect(errOut).toContain("empty.md");
+    expect(fsState.writes).toEqual([]);
+  });
+
+  it("main(): succeeds when auto-discovered PR template candidates are missing", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("DIFF-NO-AUTO-PR\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--out=/repo/OUT.txt", "--lines=50"];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.path).toBe("/repo/OUT.txt");
+    expect(out.data).toContain("DIFF-NO-AUTO-PR");
+  });
+
   it("main(): --no-pr-template disables embedding even if template exists", async () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("F\n");
@@ -944,6 +1066,34 @@ describe("generate.ts flow", () => {
     // Since the default preset may output the section itself but leave its contents empty,
     // strongly assert that the content is absent
     expect(out.data).not.toMatch(/### Pull Request Template[\s\S]*PR CONTENT/);
+  });
+
+  it("main(): --no-pr-template does not read a missing --pr-template-file", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("F-MISSING-PR-SKIPPED\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    const { main } = await importSut();
+    const fsmod = await import("fs/promises");
+    const readFileMock = fsmod.readFile as unknown as ReturnType<typeof vi.fn>;
+    readFileMock.mockClear();
+
+    process.argv = [
+      "node",
+      "script",
+      "--out=/repo/OUT.txt",
+      "--no-pr-template",
+      "--pr-template-file=missing.md",
+      "--lines=50",
+    ];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.data).toContain("F-MISSING-PR-SKIPPED");
+
+    const readPaths = readFileMock.mock.calls.map((call) => String(call[0]).replace(/\\/g, "/"));
+    expect(readPaths).not.toContain("/repo/missing.md");
   });
 
   it("main(): includePrTemplate false in config disables default PR template embedding", async () => {
