@@ -1,6 +1,6 @@
 import { execFile as cpExecFile } from "child_process";
 import { readFile, writeFile, stat } from "fs/promises";
-import { join } from "path";
+import { isAbsolute, join, relative, resolve } from "path";
 import { promisify } from "util";
 
 import { getRepoRootSafe, loadUserConfig, mergeOptions } from "./config";
@@ -135,8 +135,23 @@ function toGitSlash(p: string): string {
   return p.replace(/\\/g, "/");
 }
 
+function outputPathToUntrackedExclude(repoRoot: string, outputPath: string): string | null {
+  if (!outputPath.trim()) return null;
+
+  const repoRootAbs = resolve(repoRoot);
+  const outputPathAbs = resolve(outputPath);
+  const rel = relative(repoRootAbs, outputPathAbs);
+  if (!rel || rel.startsWith("..") || isAbsolute(rel)) return null;
+
+  return toGitSlash(rel);
+}
+
 /** Build git pathspec array: [".", ":(exclude)foo", ":(exclude)bar"] */
-async function buildPathspec(repoRoot: string, opt: Options): Promise<string[]> {
+async function buildPathspec(
+  repoRoot: string,
+  opt: Options,
+  extraExcludes: string[] = [],
+): Promise<string[]> {
   const patterns = new Set<string>();
   for (const p of opt.exclude ?? []) patterns.add(p);
   if (opt.excludeFile) {
@@ -145,6 +160,7 @@ async function buildPathspec(repoRoot: string, opt: Options): Promise<string[]> 
       : join(repoRoot, opt.excludeFile);
     for (const line of await readLinesIfExists(abs)) patterns.add(line);
   }
+  for (const p of extraExcludes) patterns.add(p);
   if (patterns.size === 0) return ["."];
 
   return ["."].concat([...patterns].map((p) => `:(exclude)${toGitSlash(p)}`));
@@ -160,7 +176,8 @@ async function buildDiffArgs(repoRoot: string, opt: Options): Promise<string[][]
 }
 
 async function buildUntrackedArgs(repoRoot: string, opt: Options): Promise<string[]> {
-  const ps = await buildPathspec(repoRoot, opt);
+  const outputExclude = outputPathToUntrackedExclude(repoRoot, opt.outputPath);
+  const ps = await buildPathspec(repoRoot, opt, outputExclude ? [outputExclude] : []);
 
   return ["ls-files", "-z", "--others", "--exclude-standard", "--", ...ps];
 }
