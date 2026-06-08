@@ -36,7 +36,7 @@
     "format:oxfmt": "oxfmt .",
     "format:oxfmt:check": "oxfmt --check .",
     "typecheck": "tsc --noEmit",
-    "diff2prompt": "bun run src/index.ts --exclude=bun.lock --excludeFile=.gitignore"
+    "diff2prompt": "bun run src/index.ts --exclude=bun.lock --exclude-file=.gitignore"
   },
   "dependencies": {},
   "devDependencies": {

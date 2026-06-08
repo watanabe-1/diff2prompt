@@ -75,6 +75,8 @@ export function parseArgs(argv: string[]): Partial<Options> {
       if (v) excludes.push(v);
     } else if (a.startsWith("--exclude-file=")) {
       out.excludeFile = a.slice("--exclude-file=".length);
+    } else if (a.startsWith("--")) {
+      throw new Error(`Unknown option: ${a}`);
     }
   }
   if (excludes.length) out.exclude = excludes;
