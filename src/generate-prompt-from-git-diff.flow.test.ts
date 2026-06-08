@@ -48,9 +48,10 @@ vi.mock("child_process", () => {
     if (args[0] === "diff" && args[1] === "--") return "UNSTAGED";
     if (
       args[0] === "ls-files" &&
-      args[1] === "--others" &&
-      args[2] === "--exclude-standard" &&
-      args[3] === "--"
+      args[1] === "-z" &&
+      args[2] === "--others" &&
+      args[3] === "--exclude-standard" &&
+      args[4] === "--"
     ) {
       return "UNTRACKED";
     }
@@ -93,9 +94,8 @@ vi.mock("child_process", () => {
     });
 
     const out = list
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean)
+      .split("\0")
+      .filter((path, idx, paths) => path !== "" || idx !== paths.length - 1)
       .filter((path) => {
         const np = norm(path);
         for (const r of regexes) {
@@ -110,9 +110,9 @@ vi.mock("child_process", () => {
 
         return true;
       })
-      .join("\n");
+      .join("\0");
 
-    return out;
+    return out.length > 0 ? `${out}\0` : "";
   }
 
   function coreExecBehavior(args: string[]): {
@@ -238,6 +238,10 @@ async function mockConfig(overrides: Record<string, unknown>) {
   });
 }
 
+function nulList(...paths: string[]): string {
+  return paths.length > 0 ? `${paths.join("\0")}\0` : "";
+}
+
 describe("generate.ts flow", () => {
   const origArgv = process.argv.slice();
   const origEnv = { ...process.env };
@@ -295,7 +299,7 @@ describe("generate.ts flow", () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged(diff);
     gitMap.setStaged(""); // only unstaged changes
-    gitMap.setUntracked(["a.txt", "b.bin", "huge.txt", "err.txt"].join("\n"));
+    gitMap.setUntracked(nulList("a.txt", "b.bin", "huge.txt", "err.txt"));
 
     fsState.files.set("/repo/a.txt", { size: 5, buf: Buffer.from("hello") });
     fsState.files.set("/repo/b.bin", { size: 5, buf: Buffer.from([0x00, 0x10]) }); // binary
@@ -328,7 +332,7 @@ describe("generate.ts flow", () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("diff --git a/y b/y\n");
     gitMap.setStaged("");
-    gitMap.setUntracked("a.txt\n");
+    gitMap.setUntracked(nulList("a.txt"));
 
     const { collectDiff, defaultOptions } = await importSut();
     const s = await collectDiff({ ...defaultOptions, includeUntracked: false });
@@ -341,7 +345,7 @@ describe("generate.ts flow", () => {
     gitMap.setRoot("C:/repo\n");
     gitMap.setUnstaged("");
     gitMap.setStaged("");
-    gitMap.setUntracked("src/new.txt\n");
+    gitMap.setUntracked(nulList("src/new.txt"));
     fsState.files.set("C:/repo/src/new.txt", {
       size: 7,
       buf: Buffer.from("created", "utf8"),
@@ -360,9 +364,10 @@ describe("generate.ts flow", () => {
           ((args[0] === "diff" && args[1] === "--") ||
             (args[0] === "diff" && args[1] === "--cached" && args[2] === "--") ||
             (args[0] === "ls-files" &&
-              args[1] === "--others" &&
-              args[2] === "--exclude-standard" &&
-              args[3] === "--")),
+              args[1] === "-z" &&
+              args[2] === "--others" &&
+              args[3] === "--exclude-standard" &&
+              args[4] === "--")),
       );
       expect(collectGitCalls.map(({ opts }) => opts?.cwd)).toEqual([
         "C:/repo",
@@ -382,11 +387,68 @@ describe("generate.ts flow", () => {
     }
   });
 
+  it("collectDiff(): preserves special untracked file names from NUL-delimited git output", async () => {
+    gitMap.setRoot("C:/repo\n");
+    gitMap.setUnstaged("");
+    gitMap.setStaged("");
+
+    const files = [" leading.txt", "trailing.txt ", "unicodé/日本語.txt", "line\nbreak.txt"];
+    gitMap.setUntracked(nulList(...files));
+
+    fsState.files.set("C:/repo/ leading.txt", {
+      size: 7,
+      buf: Buffer.from("leading", "utf8"),
+    });
+    fsState.files.set("C:/repo/trailing.txt ", {
+      size: 8,
+      buf: Buffer.from("trailing", "utf8"),
+    });
+    fsState.files.set("C:/repo/unicodé/日本語.txt", {
+      size: 7,
+      buf: Buffer.from("unicode", "utf8"),
+    });
+    fsState.files.set("C:/repo/line\nbreak.txt", {
+      size: 7,
+      buf: Buffer.from("newline", "utf8"),
+    });
+
+    const { collectDiff, defaultOptions } = await importSut();
+    const s = await collectDiff({ ...defaultOptions, includeUntracked: true });
+
+    expect(s).toContain("File:  leading.txt");
+    expect(s).toContain("File: trailing.txt ");
+    expect(s).toContain("File: unicodé/日本語.txt");
+    expect(s).toContain("File: line\nbreak.txt");
+    expect(s).toContain("leading");
+    expect(s).toContain("trailing");
+    expect(s).toContain("unicode");
+    expect(s).toContain("newline");
+    expect(s).not.toContain("<read error:");
+
+    const untrackedCall = fsState.execCalls.find(
+      ({ file, args }) =>
+        file === "git" &&
+        args[0] === "ls-files" &&
+        args[1] === "-z" &&
+        args[2] === "--others" &&
+        args[3] === "--exclude-standard" &&
+        args[4] === "--",
+    );
+    expect(untrackedCall?.args).toEqual([
+      "ls-files",
+      "-z",
+      "--others",
+      "--exclude-standard",
+      "--",
+      ".",
+    ]);
+  });
+
   it("collectDiff(): rejects with --no-untracked when staged and unstaged diffs are empty", async () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("");
     gitMap.setStaged("");
-    gitMap.setUntracked("a.txt\n");
+    gitMap.setUntracked(nulList("a.txt"));
 
     const { collectDiff, defaultOptions } = await importSut();
     await expect(collectDiff({ ...defaultOptions, includeUntracked: false })).rejects.toThrow(
@@ -397,7 +459,7 @@ describe("generate.ts flow", () => {
   it("collectDiff(): --max-new-size forces skip", async () => {
     gitMap.setUnstaged("");
     gitMap.setStaged("");
-    gitMap.setUntracked("tiny.txt\n");
+    gitMap.setUntracked(nulList("tiny.txt"));
     gitMap.setRoot("/repo\n");
     fsState.files.set("/repo/tiny.txt", { size: 10, buf: Buffer.from("0123456789") });
 
@@ -449,7 +511,7 @@ describe("generate.ts flow", () => {
   it("collectDiff(): captures non-Error thrown by readFile/stat (String(e) branch)", async () => {
     gitMap.setUnstaged("");
     gitMap.setStaged("");
-    gitMap.setUntracked("weird.txt\n");
+    gitMap.setUntracked(nulList("weird.txt"));
     gitMap.setRoot("/repo\n");
 
     fsState.files.set("/repo/weird.txt", {
@@ -901,7 +963,7 @@ describe("generate.ts flow", () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("");
     gitMap.setStaged("");
-    gitMap.setUntracked(["dist/a.txt", "src/b.txt", "node_modules/x.js"].join("\n"));
+    gitMap.setUntracked(nulList("dist/a.txt", "src/b.txt", "node_modules/x.js"));
 
     fsState.files.set("/repo/src/b.txt", { size: 3, buf: Buffer.from("hey") });
 
@@ -922,7 +984,7 @@ describe("generate.ts flow", () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("DIFF\n");
     gitMap.setStaged("");
-    gitMap.setUntracked(["build/a.js", "logs/app.log", "src/ok.txt"].join("\n"));
+    gitMap.setUntracked(nulList("build/a.js", "logs/app.log", "src/ok.txt"));
 
     fsState.files.set("/repo/.d2p-ex.txt", {
       size: 100,
@@ -955,8 +1017,9 @@ describe("generate.ts flow", () => {
       ({ file, args }) =>
         file === "git" &&
         args[0] === "ls-files" &&
-        args[1] === "--others" &&
-        args[2] === "--exclude-standard",
+        args[1] === "-z" &&
+        args[2] === "--others" &&
+        args[3] === "--exclude-standard",
     );
     expect(untrackedCall?.args).toContain(":(exclude)logs");
     expect(untrackedCall?.args).toContain(":(exclude)*.tmp");
@@ -968,7 +1031,7 @@ describe("generate.ts flow", () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("");
     gitMap.setStaged("");
-    gitMap.setUntracked("keep.txt\n");
+    gitMap.setUntracked(nulList("keep.txt"));
     fsState.files.set("/repo/keep.txt", { size: 4, buf: Buffer.from("keep") });
 
     const { collectDiff, defaultOptions } = await importSut();
@@ -985,7 +1048,7 @@ describe("generate.ts flow", () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("");
     gitMap.setStaged("");
-    gitMap.setUntracked(["logs/a.log", "src/ok.txt"].join("\n"));
+    gitMap.setUntracked(nulList("logs/a.log", "src/ok.txt"));
 
     fsState.files.set("/abs/excludes.txt", {
       size: 16,
@@ -1009,7 +1072,7 @@ describe("generate.ts flow", () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("");
     gitMap.setStaged("");
-    gitMap.setUntracked(["build dir/a.js", "src/ok.txt"].join("\n"));
+    gitMap.setUntracked(nulList("build dir/a.js", "src/ok.txt"));
 
     fsState.files.set("/repo/src/ok.txt", { size: 2, buf: Buffer.from("ok") });
 
