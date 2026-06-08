@@ -371,13 +371,12 @@ describe("generate.ts flow", () => {
   });
 
   it.each(["-1", "0", "abc", "", "1.5"])(
-    "main(): rejects invalid MAX_CONSOLE_LINES=%j",
+    "main(): rejects invalid MAX_CONSOLE_LINES=%j when --lines is omitted",
     async (value) => {
       process.env.MAX_CONSOLE_LINES = value;
 
-      const { main, parseArgs } = await importSut();
-      expect(parseArgs(["node", "script", "--lines=5"]).maxConsoleLines).toBe(5);
-      process.argv = ["node", "script", "--lines=5", "--out=/repo/OUT.txt"];
+      const { main } = await importSut();
+      process.argv = ["node", "script", "--out=/repo/OUT.txt"];
 
       await expect(main()).rejects.toThrow("process.exit(1)");
 
@@ -388,6 +387,23 @@ describe("generate.ts flow", () => {
       expect(fsState.execCalls).toEqual([]);
     },
   );
+
+  it("main(): lets --lines override an invalid MAX_CONSOLE_LINES value", async () => {
+    process.env.MAX_CONSOLE_LINES = "abc";
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged(Array.from({ length: 12 }, (_, i) => `line-${i + 1}`).join("\n"));
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--lines=5", "--out=/repo/OUT.txt", "--template={{diff}}"];
+    await main();
+
+    const logs = logSpy.mock.calls.flat().join("\n");
+    expect(logs).toContain("line-5");
+    expect(logs).not.toContain("line-6");
+    expect(logs).toContain("... (truncated) ...");
+  });
 
   it("main(): lets --lines override a valid MAX_CONSOLE_LINES value", async () => {
     process.env.MAX_CONSOLE_LINES = "20";

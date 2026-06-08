@@ -285,11 +285,13 @@ export async function main() {
     const cli = parseArgs(process.argv);
     const defaults = {
       ...defaultOptions,
-      maxConsoleLines: parseEnvPositiveInteger(
-        "MAX_CONSOLE_LINES",
-        process.env.MAX_CONSOLE_LINES,
-        MAX_CONSOLE_LINES_DEFAULT,
-      ),
+      maxConsoleLines:
+        cli.maxConsoleLines ??
+        parseEnvPositiveInteger(
+          "MAX_CONSOLE_LINES",
+          process.env.MAX_CONSOLE_LINES,
+          MAX_CONSOLE_LINES_DEFAULT,
+        ),
     };
     const repoRoot = (await getRepoRootSafe()) ?? process.cwd();
     const fileCfg = await loadUserConfig(repoRoot);
