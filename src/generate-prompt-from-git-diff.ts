@@ -15,7 +15,7 @@ import {
   PREVIEW_HEADER,
   TRUNCATED_LINE,
 } from "./constants";
-import { parseCliPositiveInteger } from "./number-options";
+import { parseCliPositiveInteger, parseEnvPositiveInteger } from "./number-options";
 import { tooLargeSkipped, binarySkipped, readError, symlinkSkipped } from "./strings";
 
 const execFile = promisify(cpExecFile);
@@ -44,7 +44,7 @@ export interface Options {
 }
 
 export const defaultOptions: Options = {
-  maxConsoleLines: Number(process.env.MAX_CONSOLE_LINES) || MAX_CONSOLE_LINES_DEFAULT,
+  maxConsoleLines: MAX_CONSOLE_LINES_DEFAULT,
   outputPath: "", // temporary, set in main()
   includeUntracked: true,
   maxNewFileSizeBytes: MAX_NEWFILE_SIZE_BYTES,
@@ -283,9 +283,17 @@ export async function loadPrTemplateText(repoRoot: string, opt: Options): Promis
 export async function main() {
   try {
     const cli = parseArgs(process.argv);
+    const defaults = {
+      ...defaultOptions,
+      maxConsoleLines: parseEnvPositiveInteger(
+        "MAX_CONSOLE_LINES",
+        process.env.MAX_CONSOLE_LINES,
+        MAX_CONSOLE_LINES_DEFAULT,
+      ),
+    };
     const repoRoot = (await getRepoRootSafe()) ?? process.cwd();
     const fileCfg = await loadUserConfig(repoRoot);
-    const merged = mergeOptions(defaultOptions, fileCfg, cli, repoRoot || null, __DIRNAME_SAFE);
+    const merged = mergeOptions(defaults, fileCfg, cli, repoRoot || null, __DIRNAME_SAFE);
 
     // Validate git repo (leave constant in use)
     await runGit(["rev-parse", "--show-toplevel"], merged);

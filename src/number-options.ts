@@ -10,3 +10,13 @@ export function parseCliPositiveInteger(flag: string, rawValue: string): number 
 
   return value;
 }
+
+export function parseEnvPositiveInteger(
+  envName: string,
+  rawValue: string | undefined,
+  defaultValue: number,
+): number {
+  if (rawValue === undefined) return defaultValue;
+
+  return parseCliPositiveInteger(envName, rawValue);
+}
