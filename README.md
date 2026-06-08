@@ -188,7 +188,7 @@ to disable it.
 3. Run the checks:
 
    ```bash
-   bun run lint && bun run test
+   bun run lint && bun run typecheck && bun run test && bun run test:package
    ```
 
 4. Open a PR with a clear description and logs/screenshots if helpful.
