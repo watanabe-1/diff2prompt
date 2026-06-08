@@ -23,7 +23,7 @@ const gitMap = vi.hoisted(() => ({
 }));
 
 const fsState = vi.hoisted(() => ({
-  files: new Map<string, { size: number; buf?: Buffer; err?: Error }>(),
+  files: new Map<string, { size: number; buf?: Buffer; err?: Error; symlink?: boolean }>(),
   writes: [] as Array<{ path: string; data: string; enc?: string }>,
   execCalls: [] as Array<{
     file: string;
@@ -204,17 +204,17 @@ vi.mock("fs/promises", () => {
     },
   );
 
-  const stat = vi.fn<(path: string) => Promise<{ size: number }>>(
-    async (path: string): Promise<{ size: number }> => {
+  const lstat = vi.fn<(path: string) => Promise<{ size: number; isSymbolicLink: () => boolean }>>(
+    async (path: string): Promise<{ size: number; isSymbolicLink: () => boolean }> => {
       const f = fsState.files.get(path) ?? fsState.files.get(path.replace(/\\/g, "/"));
       if (!f) throw new Error(`ENOENT: ${path}`);
       if (f.err) throw f.err;
 
-      return { size: f.size };
+      return { size: f.size, isSymbolicLink: () => f.symlink === true };
     },
   );
 
-  return { writeFile, readFile, stat };
+  return { writeFile, readFile, lstat };
 });
 
 // SUT import AFTER mocks
@@ -371,6 +371,38 @@ describe("generate.ts flow", () => {
     expect(logs).toContain("Prompt written to: OUT.txt");
   });
 
+  it("collectDiff(): skips untracked symlinks without reading their targets", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("");
+    gitMap.setStaged("");
+    gitMap.setUntracked(nulList("link.txt", "normal.txt"));
+
+    fsState.files.set("/repo/link.txt", {
+      size: 27,
+      buf: Buffer.from("EXTERNAL_SECRET_CONTENT", "utf8"),
+      symlink: true,
+    });
+    fsState.files.set("/repo/normal.txt", {
+      size: 13,
+      buf: Buffer.from("normal file", "utf8"),
+    });
+
+    const { collectDiff, defaultOptions } = await importSut();
+    const s = await collectDiff({ ...defaultOptions, includeUntracked: true });
+
+    expect(s).toContain("File: link.txt");
+    expect(s).toContain("<symlink skipped>");
+    expect(s).not.toContain("EXTERNAL_SECRET_CONTENT");
+    expect(s).toContain("File: normal.txt");
+    expect(s).toContain("normal file");
+
+    const fsmod = await import("fs/promises");
+    const readFileMock = fsmod.readFile as unknown as ReturnType<typeof vi.fn>;
+    const readPaths = readFileMock.mock.calls.map((call) => String(call[0]).replace(/\\/g, "/"));
+    expect(readPaths).not.toContain("/repo/link.txt");
+    expect(readPaths).toContain("/repo/normal.txt");
+  });
+
   it("collectDiff(): respects --no-untracked", async () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("diff --git a/y b/y\n");
@@ -419,11 +451,11 @@ describe("generate.ts flow", () => {
       ]);
 
       const fsmod = await import("fs/promises");
-      const statMock = fsmod.stat as unknown as ReturnType<typeof vi.fn>;
+      const lstatMock = fsmod.lstat as unknown as ReturnType<typeof vi.fn>;
       const readFileMock = fsmod.readFile as unknown as ReturnType<typeof vi.fn>;
       const normalize = (path: string) => path.replace(/\\/g, "/");
 
-      expect(normalize(statMock.mock.calls.at(-1)?.[0] as string)).toBe("C:/repo/src/new.txt");
+      expect(normalize(lstatMock.mock.calls.at(-1)?.[0] as string)).toBe("C:/repo/src/new.txt");
       expect(normalize(readFileMock.mock.calls.at(-1)?.[0] as string)).toBe("C:/repo/src/new.txt");
     } finally {
       cwdSpy.mockRestore();

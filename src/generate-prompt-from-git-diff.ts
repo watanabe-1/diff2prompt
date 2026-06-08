@@ -1,5 +1,5 @@
 import { execFile as cpExecFile } from "child_process";
-import { readFile, writeFile, stat } from "fs/promises";
+import { lstat, readFile, writeFile } from "fs/promises";
 import { isAbsolute, join, relative, resolve } from "path";
 import { promisify } from "util";
 
@@ -16,7 +16,7 @@ import {
   TRUNCATED_LINE,
 } from "./constants";
 import { parseCliPositiveInteger } from "./number-options";
-import { tooLargeSkipped, binarySkipped, readError } from "./strings";
+import { tooLargeSkipped, binarySkipped, readError, symlinkSkipped } from "./strings";
 
 const execFile = promisify(cpExecFile);
 
@@ -218,7 +218,11 @@ export async function collectDiff(opt: Options): Promise<string> {
       for (const file of files) {
         const filePath = join(repoRoot, file);
         try {
-          const st = await stat(filePath);
+          const st = await lstat(filePath);
+          if (st.isSymbolicLink()) {
+            full += `\n${FILE_LABEL}${file}\n${symlinkSkipped}\n`;
+            continue;
+          }
           if (st.size > opt.maxNewFileSizeBytes) {
             full += `\n${FILE_LABEL}${file}\n${tooLargeSkipped(st.size)}\n`;
             continue;

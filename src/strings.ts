@@ -4,5 +4,8 @@ export const binarySkipped = (size: number) => `<binary content skipped (${size}
 /** Message for skipped large files. */
 export const tooLargeSkipped = (size: number) => `<skipped: too large (${size} bytes)>`;
 
+/** Message for skipped symbolic links. */
+export const symlinkSkipped = "<symlink skipped>";
+
 /** Message for read errors when loading file contents. */
 export const readError = (msg: string) => `<read error: ${msg}>`;
