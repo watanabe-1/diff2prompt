@@ -156,7 +156,7 @@ async function buildDiffArgs(repoRoot: string, opt: Options): Promise<string[][]
 async function buildUntrackedArgs(repoRoot: string, opt: Options): Promise<string[]> {
   const ps = await buildPathspec(repoRoot, opt);
 
-  return ["ls-files", "--others", "--exclude-standard", "--", ...ps];
+  return ["ls-files", "-z", "--others", "--exclude-standard", "--", ...ps];
 }
 
 export async function collectDiff(opt: Options): Promise<string> {
@@ -171,10 +171,8 @@ export async function collectDiff(opt: Options): Promise<string> {
   if (opt.includeUntracked) {
     const untrackedArgs = await buildUntrackedArgs(repoRoot, opt);
     const filesStdout = await runGit(untrackedArgs, opt, repoRoot);
-    const files = filesStdout
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const files = filesStdout.split("\0");
+    if (files.at(-1) === "") files.pop();
 
     if (files.length > 0) {
       full += NEW_FILES_HEADER;
