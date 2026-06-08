@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
 
 import {
@@ -87,9 +89,26 @@ describe("parseArgs", () => {
     expect(p.prTemplateFile).toBe(".github/PR.md");
   });
 
-  it("does not expose --include-pr-template because PR templates are included by default", () => {
-    const p = parseArgs(["node", "script", "--include-pr-template"]);
-    expect(p).toEqual({});
+  it("throws for unknown flags", () => {
+    expect(() => parseArgs(["node", "script", "--include-pr-template"])).toThrow(
+      "Unknown option: --include-pr-template",
+    );
+    expect(() => parseArgs(["node", "script", "--excludeFile=.gitignore"])).toThrow(
+      "Unknown option: --excludeFile=.gitignore",
+    );
+  });
+
+  it("package diff2prompt script uses the supported exclude-file flag", () => {
+    const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")) as {
+      scripts?: Record<string, string>;
+    };
+    const script = pkg.scripts?.diff2prompt ?? "";
+
+    expect(script).toContain("--exclude-file=.gitignore");
+    expect(script).not.toContain("--excludeFile=");
+
+    const parsed = parseArgs(["node", "script", ...script.split(/\s+/).slice(3)]);
+    expect(parsed.excludeFile).toBe(".gitignore");
   });
 });
 
