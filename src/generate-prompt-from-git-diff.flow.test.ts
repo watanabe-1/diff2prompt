@@ -1023,6 +1023,136 @@ describe("generate.ts flow", () => {
     expect(s).not.toContain("File: node_modules/x.js");
   });
 
+  it("main(): excludes the default output file from untracked files", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("");
+    gitMap.setStaged("");
+    gitMap.setUntracked(nulList("generated-prompt.txt", "notes.txt"));
+
+    fsState.files.set("/repo/notes.txt", { size: 4, buf: Buffer.from("keep") });
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--lines=50"];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.path.replace(/\\/g, "/")).toBe("/repo/generated-prompt.txt");
+    expect(out.data).toContain("File: notes.txt");
+    expect(out.data).toContain("keep");
+    expect(out.data).not.toContain("File: generated-prompt.txt");
+
+    const untrackedCall = fsState.execCalls.find(
+      ({ file, args }) =>
+        file === "git" &&
+        args[0] === "ls-files" &&
+        args[1] === "-z" &&
+        args[2] === "--others" &&
+        args[3] === "--exclude-standard",
+    );
+    expect(untrackedCall?.args).toContain(":(exclude)generated-prompt.txt");
+  });
+
+  it("collectDiff(): excludes an explicit repo-root output file from untracked files", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("");
+    gitMap.setStaged("");
+    gitMap.setUntracked(nulList("custom.txt", "src/keep.txt"));
+
+    fsState.files.set("/repo/src/keep.txt", { size: 2, buf: Buffer.from("ok") });
+
+    const { collectDiff, defaultOptions } = await importSut();
+    const s = await collectDiff({
+      ...defaultOptions,
+      includeUntracked: true,
+      outputPath: "/repo/custom.txt",
+    });
+
+    expect(s).toContain("File: src/keep.txt");
+    expect(s).toContain("ok");
+    expect(s).not.toContain("File: custom.txt");
+
+    const untrackedCall = fsState.execCalls.find(
+      ({ file, args }) =>
+        file === "git" &&
+        args[0] === "ls-files" &&
+        args[1] === "-z" &&
+        args[2] === "--others" &&
+        args[3] === "--exclude-standard",
+    );
+    expect(untrackedCall?.args).toContain(":(exclude)custom.txt");
+  });
+
+  it("main(): excludes a config outputFile from untracked files", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("");
+    gitMap.setStaged("");
+    gitMap.setUntracked(nulList("from-config.txt", "src/keep.txt"));
+
+    await mockConfig({
+      getRepoRootSafe: vi.fn<() => Promise<string>>().mockResolvedValue("/repo"),
+      loadUserConfig: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
+        outputPath: "/repo/from-config.txt",
+      }),
+    });
+
+    fsState.files.set("/repo/src/keep.txt", { size: 2, buf: Buffer.from("ok") });
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--lines=50"];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.path).toBe("/repo/from-config.txt");
+    expect(out.data).toContain("File: src/keep.txt");
+    expect(out.data).not.toContain("File: from-config.txt");
+
+    const untrackedCall = fsState.execCalls.find(
+      ({ file, args }) =>
+        file === "git" &&
+        args[0] === "ls-files" &&
+        args[1] === "-z" &&
+        args[2] === "--others" &&
+        args[3] === "--exclude-standard",
+    );
+    expect(untrackedCall?.args).toContain(":(exclude)from-config.txt");
+  });
+
+  it("collectDiff(): does not add a pathspec exclude for output outside repo root", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("");
+    gitMap.setStaged("");
+    gitMap.setUntracked(nulList("keep.txt"));
+
+    fsState.files.set("/repo/keep.txt", { size: 4, buf: Buffer.from("keep") });
+
+    const { collectDiff, defaultOptions } = await importSut();
+    const s = await collectDiff({
+      ...defaultOptions,
+      includeUntracked: true,
+      outputPath: "/tmp/generated-prompt.txt",
+    });
+
+    expect(s).toContain("File: keep.txt");
+    expect(s).toContain("keep");
+
+    const untrackedCall = fsState.execCalls.find(
+      ({ file, args }) =>
+        file === "git" &&
+        args[0] === "ls-files" &&
+        args[1] === "-z" &&
+        args[2] === "--others" &&
+        args[3] === "--exclude-standard",
+    );
+    expect(untrackedCall?.args).toEqual([
+      "ls-files",
+      "-z",
+      "--others",
+      "--exclude-standard",
+      "--",
+      ".",
+    ]);
+  });
+
   it("main(): --exclude and --exclude-file together (integration)", async () => {
     gitMap.setRoot("/repo\n");
     gitMap.setUnstaged("DIFF\n");
