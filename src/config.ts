@@ -5,6 +5,7 @@ import { promisify } from "util";
 
 import { DEFAULT_OUTPUT_FILENAME } from "./constants";
 import type { Options } from "./generate-prompt-from-git-diff";
+import { isPositiveInteger } from "./number-options";
 
 const execFile = promisify(cpExecFile);
 
@@ -102,7 +103,7 @@ function pickString(obj: Record<string, unknown>, key: StringKeys<UserConfig>): 
 function pickNumber(obj: Record<string, unknown>, key: NumberKeys<UserConfig>): number | undefined {
   const v = obj[key];
 
-  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+  return typeof v === "number" && isPositiveInteger(v) ? v : undefined;
 }
 
 function pickBoolean(

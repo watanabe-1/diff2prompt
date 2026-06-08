@@ -50,7 +50,7 @@ diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--
 ### Flags
 
 - `--lines=N`
-  Preview line count in the console. Defaults to `MAX_CONSOLE_LINES` env or `10`.
+  Preview line count in the console. Must be a positive integer. Defaults to `MAX_CONSOLE_LINES` env or `10`.
 
 - `--no-untracked`
   Do **not** include new/untracked files in the prompt.
@@ -60,10 +60,10 @@ diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--
   (falls back to `process.cwd()` if repo root is unknown).
 
 - `--max-new-size=BYTES`
-  Skip new/untracked files larger than this size. Default: `1_000_000` (1MB).
+  Skip new/untracked files larger than this size. Must be a positive integer. Default: `1_000_000` (1MB).
 
 - `--max-buffer=BYTES`
-  Pass-through to `child_process.exec` for large diffs. Default: `50 * 1024 * 1024`.
+  Pass-through to `child_process.exec` for large diffs. Must be a positive integer. Default: `50 * 1024 * 1024`.
 
 - `--template=STRING`
   Inline template string. Placeholders: `{{diff}}`, `{{now}}`, `{{repoRoot}}`.
@@ -132,6 +132,7 @@ You can set persistent defaults via any of the following (first match wins):
 - `prTemplateFile` specifies a custom path to the PR template.
 - Relative paths are resolved against the repo root.
 - `exclude` and `excludeFile` let you filter out noisy untracked files.
+- Numeric config fields (`maxConsoleLines`, `maxNewFileSizeBytes`, and `maxBuffer`) must be positive integers.
 
 ---
 

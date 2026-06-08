@@ -289,6 +289,18 @@ describe("normalizeUserConfig", () => {
     expect(cfg).toEqual({});
   });
 
+  it("ignores non-positive and non-integer numbers", () => {
+    const cfg = normalizeUserConfig(
+      rec({
+        maxConsoleLines: 0,
+        maxNewFileSizeBytes: -1,
+        maxBuffer: 1.5,
+      }),
+      "C:/repo",
+    );
+    expect(cfg).toEqual({});
+  });
+
   it("normalizes exclude array and excludeFile (relative -> absolute)", () => {
     const cfg = normalizeUserConfig(
       rec({

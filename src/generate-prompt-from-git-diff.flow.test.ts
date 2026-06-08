@@ -294,6 +294,49 @@ describe("generate.ts flow", () => {
     expect(parsed.excludeFile).toBe(".d2p=a.txt");
   });
 
+  it("main(): valid numeric flags are applied", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("");
+    gitMap.setStaged("");
+    gitMap.setUntracked(nulList("tiny.txt"));
+    fsState.files.set("/repo/tiny.txt", { size: 10, buf: Buffer.from("0123456789") });
+
+    const { main } = await importSut();
+    process.argv = [
+      "node",
+      "script",
+      "--lines=2",
+      "--max-new-size=5",
+      "--max-buffer=456",
+      "--out=/repo/OUT.txt",
+    ];
+    await main();
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.data).toMatch(/File: tiny\.txt/);
+    expect(out.data).toMatch(/skipped: too large \(10 bytes\)/);
+    const runGitCalls = fsState.execCalls.filter(({ opts }) => opts !== undefined);
+    expect(runGitCalls.every(({ opts }) => opts?.maxBuffer === 456)).toBe(true);
+
+    const logs = logSpy.mock.calls.flat().join("\n");
+    expect(logs).toContain("... (truncated) ...");
+  });
+
+  it.each([
+    ["--lines=abc", "Invalid value for --lines: expected a positive integer"],
+    ["--max-new-size=-1", "Invalid value for --max-new-size: expected a positive integer"],
+    ["--max-buffer=0", "Invalid value for --max-buffer: expected a positive integer"],
+  ])("main(): rejects invalid numeric flag %s", async (flag, message) => {
+    const { main } = await importSut();
+    process.argv = ["node", "script", flag];
+
+    await expect(main()).rejects.toThrow("process.exit(1)");
+
+    const errOut = errSpy.mock.calls.flat().join("\n");
+    expect(errOut).toContain(`Error: ${message}`);
+    expect(fsState.execCalls).toEqual([]);
+  });
+
   it("main(): diff + untracked (text/binary/huge/error), truncated preview, writes file", async () => {
     const diff = "diff --git a/x b/x\n@@\n-1\n+2\n";
     gitMap.setRoot("/repo\n");
