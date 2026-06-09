@@ -24,6 +24,7 @@ const gitMap = vi.hoisted(() => ({
 
 const fsState = vi.hoisted(() => ({
   files: new Map<string, { size: number; buf?: Buffer; err?: Error; symlink?: boolean }>(),
+  mkdirs: [] as Array<{ path: string; recursive?: boolean }>,
   writes: [] as Array<{ path: string; data: string; enc?: string }>,
   execCalls: [] as Array<{
     file: string;
@@ -32,6 +33,7 @@ const fsState = vi.hoisted(() => ({
   }>,
   reset() {
     this.files.clear();
+    this.mkdirs.length = 0;
     this.writes.length = 0;
     this.execCalls.length = 0;
   },
@@ -186,6 +188,12 @@ vi.mock("child_process", () => {
 
 // ---- fs/promises mock ----
 vi.mock("fs/promises", () => {
+  const mkdir = vi.fn<(path: string, opts?: { recursive?: boolean }) => Promise<void>>(
+    async (path: string, opts?: { recursive?: boolean }) => {
+      fsState.mkdirs.push({ path, recursive: opts?.recursive });
+    },
+  );
+
   const writeFile = vi.fn<(path: string, data: string, enc?: string) => Promise<void>>(
     async (path: string, data: string, enc?: string) => {
       fsState.writes.push({ path, data, enc });
@@ -214,7 +222,7 @@ vi.mock("fs/promises", () => {
     },
   );
 
-  return { writeFile, readFile, lstat };
+  return { mkdir, writeFile, readFile, lstat };
 });
 
 // SUT import AFTER mocks
@@ -454,6 +462,30 @@ describe("generate.ts flow", () => {
     expect(logs).toContain("--- Prompt (preview) ---");
     expect(logs).toContain("... (truncated) ...");
     expect(logs).toContain("Prompt written to: OUT.txt");
+  });
+
+  it("main(): creates the parent directory before writing a relative --out path", async () => {
+    gitMap.setRoot("/repo\n");
+    gitMap.setUnstaged("DIFF\n");
+    gitMap.setStaged("");
+    gitMap.setUntracked("");
+
+    const { main } = await importSut();
+    process.argv = ["node", "script", "--out=.tmp/prompt.txt"];
+    await main();
+
+    expect(fsState.mkdirs).toEqual([{ path: ".tmp", recursive: true }]);
+
+    const out = fsState.writes.at(-1)!;
+    expect(out.path).toBe(".tmp/prompt.txt");
+    expect(out.data).toContain("DIFF");
+
+    const fsmod = await import("fs/promises");
+    const mkdirMock = fsmod.mkdir as unknown as ReturnType<typeof vi.fn>;
+    const writeFileMock = fsmod.writeFile as unknown as ReturnType<typeof vi.fn>;
+    expect(mkdirMock.mock.invocationCallOrder[0]).toBeLessThan(
+      writeFileMock.mock.invocationCallOrder[0],
+    );
   });
 
   it("collectDiff(): skips untracked symlinks without reading their targets", async () => {

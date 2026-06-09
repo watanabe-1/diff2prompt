@@ -1,6 +1,6 @@
 import { execFile as cpExecFile } from "child_process";
-import { lstat, readFile, writeFile } from "fs/promises";
-import { isAbsolute, join, relative, resolve } from "path";
+import { lstat, mkdir, readFile, writeFile } from "fs/promises";
+import { dirname, isAbsolute, join, relative, resolve } from "path";
 import { promisify } from "util";
 
 import { getRepoRootSafe, loadUserConfig, mergeOptions } from "./config";
@@ -338,6 +338,7 @@ export async function main() {
     });
 
     printPreview(prompt, merged.maxConsoleLines);
+    await mkdir(dirname(merged.outputPath), { recursive: true });
     await writeFile(merged.outputPath, prompt, "utf8");
     console.log(`\nPrompt written to: ${merged.outputPath}`);
   } catch (err: unknown) {
