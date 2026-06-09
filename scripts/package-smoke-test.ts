@@ -55,7 +55,7 @@ async function verifyBuiltCli(): Promise<void> {
     const trackedPath = join(tempRoot, "tracked.txt");
     await writeFile(trackedPath, "before\n", "utf8");
     await run("git", ["add", "tracked.txt"], tempRoot);
-    await run("git", ["commit", "-m", "Initial commit"], tempRoot);
+    await run("git", ["-c", "commit.gpgsign=false", "commit", "-m", "Initial commit"], tempRoot);
 
     await writeFile(trackedPath, "after\n", "utf8");
 
