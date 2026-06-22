@@ -146,58 +146,58 @@
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/zizmorcore/zizmor/v1.25.2/zizmor-aarch64-apple-darwin.tar.gz",
-      "checksum": "624EF0E09521AECD862126BE0F6D7754669AF2646750D68AC48A114BE33C3146",
+      "id": "github_release/github.com/zizmorcore/zizmor/v1.26.1/zizmor-aarch64-apple-darwin.tar.gz",
+      "checksum": "68AB2B37836BBD44F6CFFFCC102B9FFFFBC20C5D67D84293DAFB63BD2775A1DA",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/zizmorcore/zizmor/v1.25.2/zizmor-aarch64-unknown-linux-gnu.tar.gz",
-      "checksum": "4B4B9491112C2A09B318101C0D3349B73AF1C4F532E097DD6D0164F2ABDA760D",
+      "id": "github_release/github.com/zizmorcore/zizmor/v1.26.1/zizmor-aarch64-unknown-linux-gnu.tar.gz",
+      "checksum": "711F5AF366B299128F9A04B1470E37D990B41FBD21F14A1A4148D25004A83762",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/zizmorcore/zizmor/v1.25.2/zizmor-x86_64-apple-darwin.tar.gz",
-      "checksum": "353271B9EC301DD4BA158AF481323C831C6E9B494D5AC3F5AA58CF4B207699CC",
+      "id": "github_release/github.com/zizmorcore/zizmor/v1.26.1/zizmor-x86_64-apple-darwin.tar.gz",
+      "checksum": "2967414A561F8C1264121E8F723C3B5ABCF3D1BF7CE5063114DF99985DD75801",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/zizmorcore/zizmor/v1.25.2/zizmor-x86_64-pc-windows-msvc.zip",
-      "checksum": "65D46A8144F701200621B580F632076D80D082D60856DE9F88793A95FB5882D7",
+      "id": "github_release/github.com/zizmorcore/zizmor/v1.26.1/zizmor-x86_64-pc-windows-msvc.zip",
+      "checksum": "C6CEA156935E3B9D36FAECA4FD8F622D23F7A7578DA26ADB34E6456ABD9BEB9A",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/zizmorcore/zizmor/v1.25.2/zizmor-x86_64-unknown-linux-gnu.tar.gz",
-      "checksum": "AA1FACD105F0D83FE5C55B1ADCD9D7417DE5D83AA27471F91DC0B66CF3803577",
+      "id": "github_release/github.com/zizmorcore/zizmor/v1.26.1/zizmor-x86_64-unknown-linux-gnu.tar.gz",
+      "checksum": "8556289A64E7AAF2400CD516F61A471AA91C5902CC56AD96A82FD12F90C2EF73",
       "algorithm": "sha256"
     },
     {
-      "id": "http/nodejs.org/dist/v26.3.0/node-v26.3.0-darwin-arm64.tar.gz",
-      "checksum": "77EF7F7A15AA757C2CA19D63CF41C8D9EB3B18590EBC6883871310787D8C6B6C",
+      "id": "http/nodejs.org/dist/v26.3.1/node-v26.3.1-darwin-arm64.tar.gz",
+      "checksum": "3F624AB0D774553C0D28B968E141D8C676A35A2811FB0B7B356BA9CBDCE15F74",
       "algorithm": "sha256"
     },
     {
-      "id": "http/nodejs.org/dist/v26.3.0/node-v26.3.0-darwin-x64.tar.gz",
-      "checksum": "7453BD54A17BDC656E2E784D702F6EEB224FB517965E6F8C5A31A88C83D3804C",
+      "id": "http/nodejs.org/dist/v26.3.1/node-v26.3.1-darwin-x64.tar.gz",
+      "checksum": "3EC9E5A28C641C088F3D04AD38721BFDEDB2F8AA8C031979FA93DF08B5A92E58",
       "algorithm": "sha256"
     },
     {
-      "id": "http/nodejs.org/dist/v26.3.0/node-v26.3.0-linux-arm64.tar.gz",
-      "checksum": "B2E01F65905C24CB5DD19C4CFBFEFE0118E0504C170CC18BEAC343A2ABBB59BD",
+      "id": "http/nodejs.org/dist/v26.3.1/node-v26.3.1-linux-arm64.tar.gz",
+      "checksum": "2F0829B201E9DB20996AE15BCE62138DF1E3D317775B005778B05CF7B19714F1",
       "algorithm": "sha256"
     },
     {
-      "id": "http/nodejs.org/dist/v26.3.0/node-v26.3.0-linux-x64.tar.gz",
-      "checksum": "A6E65CC653E40C1653B77742F9185DBCE3FF1F99FA2746D211BDDB53530EF206",
+      "id": "http/nodejs.org/dist/v26.3.1/node-v26.3.1-linux-x64.tar.gz",
+      "checksum": "E892CD615E637EDEBCF22F9653D80FBA63167AD6754D20881FD52CC37BE81441",
       "algorithm": "sha256"
     },
     {
-      "id": "http/nodejs.org/dist/v26.3.0/node-v26.3.0-win-x64.zip",
-      "checksum": "EC6D0F6B056C89498A9B26C4D5C77A31FD0B7FE45BA8A45FA87D26F66C3EBCE4",
+      "id": "http/nodejs.org/dist/v26.3.1/node-v26.3.1-win-x64.zip",
+      "checksum": "45001B289EBFFE7B22260898F3750059183D8246042B88E8FFA4337E65E6763E",
       "algorithm": "sha256"
     },
     {
-      "id": "registries/github_content/github.com/aquaproj/aqua-registry/v4.525.0/registry.yaml",
-      "checksum": "C46711663DD69C22C948416229B1D8EFD4CE3D437E0B3FA046CE1D39D96E5EF7",
+      "id": "registries/github_content/github.com/aquaproj/aqua-registry/v4.526.0/registry.yaml",
+      "checksum": "E2BB546D74F7E8D5276F00F2BC342E0CA3D7AC34B7AA442058CBFDBE318346E8",
       "algorithm": "sha256"
     }
   ]
