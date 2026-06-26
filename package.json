@@ -42,12 +42,12 @@
   "dependencies": {},
   "devDependencies": {
     "@types/node": "^25.9.3",
-    "@vitest/coverage-v8": "^4.1.8",
-    "@vitest/ui": "^4.1.8",
+    "@vitest/coverage-v8": "^4.1.9",
+    "@vitest/ui": "^4.1.9",
     "esbuild": "^0.28.1",
-    "oxfmt": "^0.54.0",
-    "oxlint": "^1.69.0",
+    "oxfmt": "^0.55.0",
+    "oxlint": "^1.70.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   }
 }
