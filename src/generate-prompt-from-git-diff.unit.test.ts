@@ -82,7 +82,7 @@ describe("parseArgs", () => {
     expect(p.templatePreset).toBe("minimal");
   });
 
-  it("parses multiple --exclude and --exclude-file", () => {
+  it("parses multiple --exclude, --exclude-file, and --gitignore-file", () => {
     const p = parseArgs([
       "node",
       "script",
@@ -90,9 +90,11 @@ describe("parseArgs", () => {
       "--exclude=node_modules/",
       "--exclude=*.lock",
       "--exclude-file=ex.txt",
+      "--gitignore-file=.gitignore",
     ]);
     expect(p.exclude).toEqual(["dist", "node_modules/", "*.lock"]);
     expect(p.excludeFile).toBe("ex.txt");
+    expect(p.gitignoreFile).toBe(".gitignore");
   });
 
   it("parses --no-pr-template and --pr-template-file", () => {
@@ -163,6 +165,18 @@ describe("merge behavior (defaults -> file -> cli)", () => {
     const cli = parseArgs(["node", "script", "--out=C:/tmp/cli.txt"]);
     const merged = mergeOptions(defaultOptions, fileCfg, cli, "C:/repo", "C:/cwd");
     expect(merged.outputPath.replace(/\\/g, "/")).toBe("C:/tmp/cli.txt".replace(/\\/g, "/"));
+  });
+
+  it("CLI gitignoreFile overrides file config", () => {
+    const cli = parseArgs(["node", "script", "--gitignore-file=cli.ignore"]);
+    const merged = mergeOptions(
+      defaultOptions,
+      { gitignoreFile: "C:/repo/config.ignore" },
+      cli,
+      "C:/repo",
+      "C:/cwd",
+    );
+    expect(merged.gitignoreFile).toBe("cli.ignore");
   });
 
   it("parseArgs parses other flags and keeps them intact", () => {

@@ -41,6 +41,8 @@ export interface Options {
   exclude?: string[];
   /** A file that lists excludes (one per line). Absolute or relative to repo root. */
   excludeFile?: string;
+  /** A Git ignore-format file interpreted by Git itself. Absolute or relative to repo root. */
+  gitignoreFile?: string;
 }
 
 export const defaultOptions: Options = {
@@ -81,6 +83,8 @@ export function parseArgs(argv: string[]): Partial<Options> {
       if (v) excludes.push(v);
     } else if (a.startsWith("--exclude-file=")) {
       out.excludeFile = a.slice("--exclude-file=".length);
+    } else if (a.startsWith("--gitignore-file=")) {
+      out.gitignoreFile = a.slice("--gitignore-file=".length);
     } else if (a.startsWith("--")) {
       throw new Error(`Unknown option: ${a}`);
     }
@@ -151,6 +155,17 @@ function toGitSlash(p: string): string {
   return p.replace(/\\/g, "/");
 }
 
+function resolveGitignoreFile(repoRoot: string, path: string): string {
+  return toGitSlash(isAbsolutePathLike(path) ? path : join(repoRoot, path));
+}
+
+function parseNulList(stdout: string): string[] {
+  const paths = stdout.split("\0");
+  if (paths.at(-1) === "") paths.pop();
+
+  return paths.map(toGitSlash);
+}
+
 function outputPathToUntrackedExclude(repoRoot: string, outputPath: string): string | null {
   if (!outputPath.trim()) return null;
 
@@ -183,7 +198,32 @@ async function buildPathspec(
 }
 
 async function buildDiffArgs(repoRoot: string, opt: Options): Promise<string[][]> {
-  const ps = await buildPathspec(repoRoot, opt);
+  let ignoredPaths: string[] = [];
+  if (opt.gitignoreFile) {
+    let hasHead = true;
+    try {
+      await runGit(["rev-parse", "--verify", "HEAD"], opt, repoRoot);
+    } catch {
+      hasHead = false;
+    }
+    const withTreeArgs = hasHead ? ["--with-tree=HEAD"] : [];
+    ignoredPaths = parseNulList(
+      await runGit(
+        [
+          "ls-files",
+          "--cached",
+          "--ignored",
+          ...withTreeArgs,
+          `--exclude-from=${resolveGitignoreFile(repoRoot, opt.gitignoreFile)}`,
+          "-z",
+        ],
+        opt,
+        repoRoot,
+      ),
+    );
+  }
+  const ignoredPathspecs = ignoredPaths.map((path) => `:(exclude,top,literal)${path}`);
+  const ps = [...(await buildPathspec(repoRoot, opt)), ...ignoredPathspecs];
 
   return [
     ["diff", "--", ...ps],
@@ -195,12 +235,16 @@ async function buildUntrackedArgs(repoRoot: string, opt: Options): Promise<strin
   const outputExclude = outputPathToUntrackedExclude(repoRoot, opt.outputPath);
   const ps = await buildPathspec(repoRoot, opt, outputExclude ? [outputExclude] : []);
 
-  return ["ls-files", "-z", "--others", "--exclude-standard", "--", ...ps];
+  const ignoreArgs = opt.gitignoreFile
+    ? [`--exclude-from=${resolveGitignoreFile(repoRoot, opt.gitignoreFile)}`]
+    : [];
+
+  return ["ls-files", "-z", "--others", "--exclude-standard", ...ignoreArgs, "--", ...ps];
 }
 
-export async function collectDiff(opt: Options): Promise<string> {
+export async function collectDiff(opt: Options, repoRootOverride?: string): Promise<string> {
   // Resolve repo root for pathspec resolution and exclude-file
-  const repoRoot = (await getRepoRootSafe()) ?? process.cwd();
+  const repoRoot = repoRootOverride ?? (await getRepoRootSafe()) ?? process.cwd();
 
   const [diffArgs, diffCachedArgs] = await buildDiffArgs(repoRoot, opt);
   const unstaged = await runGit(diffArgs, opt, repoRoot);
@@ -210,8 +254,7 @@ export async function collectDiff(opt: Options): Promise<string> {
   if (opt.includeUntracked) {
     const untrackedArgs = await buildUntrackedArgs(repoRoot, opt);
     const filesStdout = await runGit(untrackedArgs, opt, repoRoot);
-    const files = filesStdout.split("\0");
-    if (files.at(-1) === "") files.pop();
+    const files = parseNulList(filesStdout);
 
     if (files.length > 0) {
       full += NEW_FILES_HEADER;
