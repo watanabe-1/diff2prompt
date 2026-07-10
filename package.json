@@ -1,6 +1,6 @@
 {
   "name": "diff2prompt",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "CLI tool for turning Git diffs into AI-ready prompts",
   "keywords": [
     "cli",
