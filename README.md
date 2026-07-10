@@ -81,6 +81,11 @@ diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--
 - `--exclude-file=PATH`
   Load exclude patterns (one per line, `#` for comments). Relative paths are resolved against the repo root.
 
+- `--gitignore-file=PATH`
+  Use an additional Git ignore-format file for tracked and untracked files. Git interprets
+  root anchoring, negation, ordering, escaping, and directory-only rules. Relative paths are
+  resolved against the repo root.
+
 - `--no-pr-template`
   Do **not** search for or embed the repository's `pull_request_template.md`.
 
@@ -120,6 +125,7 @@ You can set persistent defaults via any of the following (first match wins):
   "templatePreset": "minimal",
   "exclude": ["dist", "node_modules"],
   "excludeFile": ".gitignore",
+  "gitignoreFile": ".gitignore",
   "includePrTemplate": true,
   "prTemplateFile": ".github/pull_request_template.md"
 }
@@ -131,7 +137,9 @@ You can set persistent defaults via any of the following (first match wins):
   It defaults to `true`; set it to `false` to disable PR template embedding.
 - `prTemplateFile` specifies a custom path to the PR template.
 - Relative paths are resolved against the repo root.
-- `exclude` and `excludeFile` let you filter out noisy untracked files.
+- `exclude`, `excludeFile`, and `gitignoreFile` are combined as exclusions. Negation and ordering
+  inside `gitignoreFile` retain Git's ignore semantics. Unlike the other two fields,
+  `gitignoreFile` applies to tracked changes as well as untracked files.
 - Numeric config fields (`maxConsoleLines`, `maxNewFileSizeBytes`, and `maxBuffer`) must be positive integers.
 
 ---
@@ -153,6 +161,9 @@ diff2prompt --exclude="build dir"
 
 # Exclude from a file
 diff2prompt --exclude-file=.gitignore
+
+# Let Git interpret a Git ignore-format file
+diff2prompt --gitignore-file=.gitignore
 
 # Disable automatic pull request template embedding
 diff2prompt --no-pr-template

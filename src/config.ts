@@ -25,6 +25,8 @@ export type UserConfig = Partial<{
   exclude?: string[];
   /** File path that lists excludes (one per line) */
   excludeFile?: string;
+  /** Git ignore-format file interpreted by Git */
+  gitignoreFile?: string;
 }>;
 
 // Extract keys whose value types are assignable to V (e.g., string/number/boolean).
@@ -177,6 +179,7 @@ export function normalizeUserConfig(cfgRaw: unknown, baseDir: string): Partial<O
   const outputFile = pickString(cfgRaw, "outputFile");
   const exclude = pickStringArray(cfgRaw, "exclude");
   const excludeFile = pickString(cfgRaw, "excludeFile");
+  const gitignoreFile = pickString(cfgRaw, "gitignoreFile");
 
   let resolvedOutputPath: string | undefined;
 
@@ -219,6 +222,11 @@ export function normalizeUserConfig(cfgRaw: unknown, baseDir: string): Partial<O
   if (exclude && exclude.length) out.exclude = exclude;
   if (excludeFile && excludeFile.trim()) {
     out.excludeFile = isAbsolutePath(excludeFile) ? excludeFile : join(baseDir, excludeFile);
+  }
+  if (gitignoreFile && gitignoreFile.trim()) {
+    out.gitignoreFile = isAbsolutePath(gitignoreFile)
+      ? gitignoreFile
+      : join(baseDir, gitignoreFile);
   }
 
   return out;

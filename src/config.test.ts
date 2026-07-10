@@ -340,6 +340,12 @@ describe("normalizeUserConfig", () => {
     expect(cfg.excludeFile?.replace(/\\/g, "/")).toBe("C:/abs/ex.txt");
   });
 
+  it("normalizes gitignoreFile relative to the config base directory", () => {
+    const cfg = normalizeUserConfig({ gitignoreFile: ".gitignore" }, "C:/repo");
+
+    expect(cfg.gitignoreFile?.replace(/\\/g, "/")).toBe("C:/repo/.gitignore");
+  });
+
   it("loadUserConfig picks exclude fields from files", async () => {
     putFile("C:/repo/diff2prompt.config.json", {
       exclude: ["dist", "*.snap"],
