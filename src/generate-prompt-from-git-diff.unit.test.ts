@@ -112,17 +112,18 @@ describe("parseArgs", () => {
     );
   });
 
-  it("package diff2prompt script uses the supported exclude-file flag", () => {
+  it("package diff2prompt script uses the Git ignore-format file flag", () => {
     const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")) as {
       scripts?: Record<string, string>;
     };
     const script = pkg.scripts?.diff2prompt ?? "";
 
-    expect(script).toContain("--exclude-file=.gitignore");
+    expect(script).toContain("--gitignore-file=.gitignore");
+    expect(script).not.toContain("--exclude-file=.gitignore");
     expect(script).not.toContain("--excludeFile=");
 
     const parsed = parseArgs(["node", "script", ...script.split(/\s+/).slice(3)]);
-    expect(parsed.excludeFile).toBe(".gitignore");
+    expect(parsed.gitignoreFile).toBe(".gitignore");
   });
 });
 
