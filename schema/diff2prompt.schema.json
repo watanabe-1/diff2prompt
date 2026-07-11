@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/watanabe-1/diff2prompt/main/schema/diff2prompt.schema.json",
+  "title": "diff2prompt configuration",
+  "description": "Configuration for diff2prompt.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for editor completion and validation."
+    },
+    "outputPath": {
+      "type": "string",
+      "description": "Output file path. Relative paths are resolved against the repository root."
+    },
+    "outputFile": {
+      "type": "string",
+      "description": "Legacy alias for outputPath. outputPath takes precedence when both are set."
+    },
+    "maxConsoleLines": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of prompt lines to preview in the console."
+    },
+    "includeUntracked": {
+      "type": "boolean",
+      "description": "Whether to include new and untracked files in the generated prompt."
+    },
+    "maxNewFileSizeBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum size, in bytes, of a new or untracked file to include."
+    },
+    "maxBuffer": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum child_process exec buffer size, in bytes, for Git commands."
+    },
+    "promptTemplate": {
+      "type": "string",
+      "description": "Inline prompt template. Supports placeholders such as {{diff}}, {{now}}, {{repoRoot}}, and {{prTemplate}}."
+    },
+    "promptTemplateFile": {
+      "type": "string",
+      "description": "Path to a prompt template file. Relative paths are resolved against the repository root."
+    },
+    "templatePreset": {
+      "type": "string",
+      "description": "Built-in prompt template preset name. Known presets are default, minimal, and ja.",
+      "examples": ["default", "minimal", "ja"]
+    },
+    "exclude": {
+      "type": "array",
+      "description": "Git pathspec-style exclude patterns.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "excludeFile": {
+      "type": "string",
+      "description": "Path to a file that lists Git pathspec-style exclude patterns, one per line. This is not a Git ignore-format file. Relative paths are resolved against the repository root."
+    },
+    "gitignoreFile": {
+      "type": "string",
+      "description": "Path to a Git ignore-format file interpreted by Git, such as .gitignore. Relative paths are resolved against the repository root."
+    },
+    "includePrTemplate": {
+      "type": "boolean",
+      "description": "Whether to search for and embed pull_request_template.md content."
+    },
+    "prTemplateFile": {
+      "type": "string",
+      "description": "Path to a pull request template file. Relative paths are resolved against the repository root."
+    }
+  }
+}

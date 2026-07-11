@@ -1,5 +1,7 @@
 import { build } from "esbuild";
 import type { BuildOptions } from "esbuild";
+import { copyFile, mkdir } from "fs/promises";
+import { dirname } from "path";
 
 import pkg from "./package.json";
 
@@ -22,3 +24,7 @@ await build({
     js: "#!/usr/bin/env node",
   },
 });
+
+const schemaOutputPath = "dist/schema.json";
+await mkdir(dirname(schemaOutputPath), { recursive: true });
+await copyFile("schema/diff2prompt.schema.json", schemaOutputPath);
