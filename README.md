@@ -44,7 +44,8 @@ By default, the tool:
 ```bash
 diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--max-buffer=BYTES] \
             [--template=STRING] [--template-file=PATH] [--template-preset=NAME] \
-            [--exclude=GLOB] [--exclude-file=PATH] [--pr-template-file=PATH] [--no-pr-template]
+            [--exclude=GLOB] [--exclude-file=PATH] [--gitignore-file=PATH] \
+            [--pr-template-file=PATH] [--no-pr-template]
 ```
 
 ### Flags
@@ -75,11 +76,13 @@ diff2prompt [--lines=N] [--no-untracked] [--out=PATH] [--max-new-size=BYTES] [--
   Use a built-in preset (currently `default`, `minimal`, `ja`). Falls back to `default` if unknown.
 
 - `--exclude=GLOB`
-  Skip untracked files matching the given pattern. Supports multiple uses.
+  Exclude paths matching the given Git pathspec-style pattern. Supports multiple uses.
   Example: `--exclude=dist --exclude="build dir"`
 
 - `--exclude-file=PATH`
-  Load exclude patterns (one per line, `#` for comments). Relative paths are resolved against the repo root.
+  Load Git pathspec-style exclude patterns (one per line, `#` for comments). This is not
+  a Git ignore-format file; use `--gitignore-file` for `.gitignore` semantics. Relative
+  paths are resolved against the repo root.
 
 - `--gitignore-file=PATH`
   Use an additional Git ignore-format file for tracked and untracked files. Git interprets
@@ -114,6 +117,7 @@ You can set persistent defaults via any of the following (first match wins):
 
 ```json
 {
+  "$schema": "node_modules/diff2prompt/dist/schema.json",
   "outputPath": "generated-prompt.txt",
   "outputFile": "generated-prompt.txt",
   "maxConsoleLines": 15,
@@ -124,22 +128,25 @@ You can set persistent defaults via any of the following (first match wins):
   "promptTemplateFile": ".github/prompt.tpl.md",
   "templatePreset": "minimal",
   "exclude": ["dist", "node_modules"],
-  "excludeFile": ".gitignore",
+  "excludeFile": ".diff2promptignore",
   "gitignoreFile": ".gitignore",
   "includePrTemplate": true,
   "prTemplateFile": ".github/pull_request_template.md"
 }
 ```
 
+- Add `$schema` to enable editor completion and validation for JSON config files.
 - `outputPath` takes precedence over `outputFile` if both are present.
 - `promptTemplate` (inline string) has the highest priority, then `promptTemplateFile`, then `templatePreset`, then built-in default.
 - `includePrTemplate` controls whether diff2prompt searches for and embeds PR template contents.
   It defaults to `true`; set it to `false` to disable PR template embedding.
 - `prTemplateFile` specifies a custom path to the PR template.
 - Relative paths are resolved against the repo root.
-- `exclude`, `excludeFile`, and `gitignoreFile` are combined as exclusions. Negation and ordering
-  inside `gitignoreFile` retain Git's ignore semantics. Unlike the other two fields,
-  `gitignoreFile` applies to tracked changes as well as untracked files.
+- `exclude` and `excludeFile` use Git pathspec-style exclude patterns.
+- `gitignoreFile` uses Git ignore-format rules. Negation and ordering inside `gitignoreFile`
+  retain Git's ignore semantics.
+- `exclude`, `excludeFile`, and `gitignoreFile` are combined as exclusions for tracked changes
+  and untracked files.
 - Numeric config fields (`maxConsoleLines`, `maxNewFileSizeBytes`, and `maxBuffer`) must be positive integers.
 
 ---
@@ -159,8 +166,8 @@ diff2prompt --exclude=dist --exclude=node_modules
 # Exclude with spaces
 diff2prompt --exclude="build dir"
 
-# Exclude from a file
-diff2prompt --exclude-file=.gitignore
+# Exclude from a pathspec-style pattern file
+diff2prompt --exclude-file=.diff2promptignore
 
 # Let Git interpret a Git ignore-format file
 diff2prompt --gitignore-file=.gitignore
