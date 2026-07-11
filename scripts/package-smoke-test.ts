@@ -35,7 +35,13 @@ async function verifyPackContents(): Promise<void> {
   const stdout = await run("npm", ["pack", "--dry-run", "--json"]);
   const parsed = JSON.parse(stdout) as PackEntry[];
   const files = new Set(parsed.flatMap((entry) => entry.files ?? []).map((file) => file.path));
-  const requiredFiles = ["package.json", "README.md", "LICENSE", "dist/index.js"];
+  const requiredFiles = [
+    "package.json",
+    "README.md",
+    "LICENSE",
+    "dist/index.js",
+    "dist/schema.json",
+  ];
 
   for (const requiredFile of requiredFiles) {
     if (!files.has(requiredFile)) {
