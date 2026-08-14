@@ -76,7 +76,7 @@ jobs:
       # its release notes state Docker image use is "fully hash-checked internally".
       # See: https://github.com/zizmorcore/zizmor-action/releases/tag/v0.4.0
       - name: Run zizmor (no Advanced Security)
-        uses: zizmorcore/zizmor-action@6599ee8b7a49aef6a770f63d261d214911a7ce02 # v0.6.0
+        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
         with:
           advanced-security: false
           annotations: true
