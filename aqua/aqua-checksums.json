@@ -1,28 +1,28 @@
 {
   "checksums": [
     {
-      "id": "github_release/github.com/oven-sh/bun/bun-v1.3.14/bun-darwin-aarch64.zip",
-      "checksum": "D8B96221828AD6F97AC7AC0AB7E95872341AF763001E8803E8267652C2652620",
+      "id": "github_release/github.com/oven-sh/bun/bun-v1.4.0/bun-darwin-aarch64.zip",
+      "checksum": "C669E97F6164E1C96E0701748DB98DFA77492908CBD8394C7557134A735DE381",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/oven-sh/bun/bun-v1.3.14/bun-darwin-x64.zip",
-      "checksum": "4183DF3374623E5BAB315C547CFA0974533CD457D86B73B639F7A87974CD6633",
+      "id": "github_release/github.com/oven-sh/bun/bun-v1.4.0/bun-darwin-x64.zip",
+      "checksum": "1D0211B8F1DC991182344687AD15E72EE86F154845A5F7FA477994CD341DD9B0",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/oven-sh/bun/bun-v1.3.14/bun-linux-aarch64.zip",
-      "checksum": "A27FFB63A8310375836E0D6F668AE17FA8D8D18B88C37C821C65331973A19A3B",
+      "id": "github_release/github.com/oven-sh/bun/bun-v1.4.0/bun-linux-aarch64.zip",
+      "checksum": "4B1A332EE861983EB93BCFE6F770FFF94E3E31B2C388BDAEA3C8ED35E58EED0E",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/oven-sh/bun/bun-v1.3.14/bun-linux-x64.zip",
-      "checksum": "951EE2AEE855F08595AEEC6225226A298D3FEA83A3DCD6465C09CBCCDF7E848F",
+      "id": "github_release/github.com/oven-sh/bun/bun-v1.4.0/bun-linux-x64.zip",
+      "checksum": "2D03FB5FB83AC8B567ACA0A281B2CE1A1A19D488F56C2968D88C3F25E92FE452",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/oven-sh/bun/bun-v1.3.14/bun-windows-x64.zip",
-      "checksum": "0A0620930B6675D7BA440E81F4E0E00D3CFBE096C4B140D3FFF02205E9E18922",
+      "id": "github_release/github.com/oven-sh/bun/bun-v1.4.0/bun-windows-x64.zip",
+      "checksum": "E6F093D39DA486B20262CA8CDD5ED6A9E8BC9C2F275B78E6D3A0C5B28CC95901",
       "algorithm": "sha256"
     },
     {
@@ -146,68 +146,68 @@
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/zizmorcore/zizmor/v1.29.0/zizmor-aarch64-apple-darwin.tar.gz",
-      "checksum": "720322FADE9E83A9C7953944C438F2BA942636B86B96A8F0E6B15CE94C8A6B6F",
+      "id": "github_release/github.com/zizmorcore/zizmor/v1.30.0/zizmor-aarch64-apple-darwin.tar.gz",
+      "checksum": "C9C5D83730EFB86F2CD71B487605C00A4D63903E4F9458485ED5EAC3B1924AB1",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/zizmorcore/zizmor/v1.29.0/zizmor-aarch64-unknown-linux-gnu.tar.gz",
-      "checksum": "415EAA7C0A06479A701B8E44A3E812C1047DECC848EC4BEDE7BD6BBF49F22D20",
+      "id": "github_release/github.com/zizmorcore/zizmor/v1.30.0/zizmor-aarch64-unknown-linux-gnu.tar.gz",
+      "checksum": "018A024D6B6D09733B07F6EF42838D984C23EC04BC9B2ACD55F7D67826AEAFE5",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/zizmorcore/zizmor/v1.29.0/zizmor-x86_64-apple-darwin.tar.gz",
-      "checksum": "648B72AB9941A7F2A8D65D7B68A8E76CEF789538C8DF3A3950384D38423375B0",
+      "id": "github_release/github.com/zizmorcore/zizmor/v1.30.0/zizmor-x86_64-apple-darwin.tar.gz",
+      "checksum": "343C85C8F709EDF14BF3C8781D53574975ECBB2D23C80ED1EAB4932AB0A72343",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/zizmorcore/zizmor/v1.29.0/zizmor-x86_64-pc-windows-msvc.zip",
-      "checksum": "68A6BC6888F10BF0D53658C75885E7C1B7A0588D4C1FBC3F0CA280AD7324BF06",
+      "id": "github_release/github.com/zizmorcore/zizmor/v1.30.0/zizmor-x86_64-pc-windows-msvc.zip",
+      "checksum": "A2FCF298B84D3D8498A3D718BB63F0ABE26823BF68A11F0F439620F8F2F878F0",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/zizmorcore/zizmor/v1.29.0/zizmor-x86_64-unknown-linux-gnu.tar.gz",
-      "checksum": "DD96DF044A6E8538D5F423790F453BDD03D49E5B2BCC38214ACC41A2F1297839",
+      "id": "github_release/github.com/zizmorcore/zizmor/v1.30.0/zizmor-x86_64-unknown-linux-gnu.tar.gz",
+      "checksum": "EC8C95CD800845ABB9BBC5F377EC7C57D2EB8E2386A00A201D3A74EE4092E5ED",
       "algorithm": "sha256"
     },
     {
-      "id": "http/nodejs.org/dist/v26.7.0/node-v26.7.0-darwin-arm64.tar.gz",
-      "checksum": "7EE659A7768E641BBFD5360940660B8E8FD0052F77488F365562BAC522FC15D4",
+      "id": "http/nodejs.org/dist/v26.8.1/node-v26.8.1-darwin-arm64.tar.gz",
+      "checksum": "6E577FD0D9DB776DB82306629E441A9DACE416702622AEBDD171C9DFAA41F4D2",
       "algorithm": "sha256"
     },
     {
-      "id": "http/nodejs.org/dist/v26.7.0/node-v26.7.0-darwin-x64.tar.gz",
-      "checksum": "F279D1ED28CE57F7788BF23435D2AD7FDD7438904AD5C4D8A1081A7CDE3D4B96",
+      "id": "http/nodejs.org/dist/v26.8.1/node-v26.8.1-darwin-x64.tar.gz",
+      "checksum": "FE9C6DBF9C8E1B4443803D75E2A20366E420DAE650C747DBB116B22975751BAF",
       "algorithm": "sha256"
     },
     {
-      "id": "http/nodejs.org/dist/v26.7.0/node-v26.7.0-linux-arm64.tar.gz",
-      "checksum": "925AA6157DD37542D0D7F2E28B7BF61E7B39284411210B0498BC3788DB4AEF68",
+      "id": "http/nodejs.org/dist/v26.8.1/node-v26.8.1-linux-arm64.tar.gz",
+      "checksum": "D5F973CE975E4BD03E6C2038260F7E9201615AA8E1EE293C72F8DCC2A6D9FDDB",
       "algorithm": "sha256"
     },
     {
-      "id": "http/nodejs.org/dist/v26.7.0/node-v26.7.0-linux-x64.tar.gz",
-      "checksum": "BD6B6C31E377BAD9AD579BED72E5BC11F4C879AC9452AD51D30E646EA3D828DF",
+      "id": "http/nodejs.org/dist/v26.8.1/node-v26.8.1-linux-x64.tar.gz",
+      "checksum": "B2B76660FA4DED4E0B2A41EE3C0C651CD52EA8170EAD91EBAC1E147AC3D55643",
       "algorithm": "sha256"
     },
     {
-      "id": "http/nodejs.org/dist/v26.7.0/node-v26.7.0-win-x64.zip",
-      "checksum": "D3BD72755141ED32BBCD841228EE81897C8A98D50DFA7DAE2179399A0A7C90F8",
+      "id": "http/nodejs.org/dist/v26.8.1/node-v26.8.1-win-x64.zip",
+      "checksum": "57693D8E93D1B04E7B7DE46ACA53ECD63E97564E73DE36A68428D7FF08D83587",
       "algorithm": "sha256"
     },
     {
-      "id": "http/unofficial-builds.nodejs.org/download/release/v26.7.0/node-v26.7.0-linux-arm64-musl.tar.gz",
-      "checksum": "1F16CC0F6FEBCB1BED1D4550306806DBCFBAF5C1BC2F44F3C5C8B5D22A4CC27A",
+      "id": "http/unofficial-builds.nodejs.org/download/release/v26.8.1/node-v26.8.1-linux-arm64-musl.tar.gz",
+      "checksum": "0FE78AFDEB4A4D273B14ABBD4B946C772885C58994C9D23B1C8AE0A59A2F8A53",
       "algorithm": "sha256"
     },
     {
-      "id": "http/unofficial-builds.nodejs.org/download/release/v26.7.0/node-v26.7.0-linux-x64-musl.tar.gz",
-      "checksum": "5DC0180E7684EDE6FC9D9E6333DA45686F4B5A7820729D33C68335B283337295",
+      "id": "http/unofficial-builds.nodejs.org/download/release/v26.8.1/node-v26.8.1-linux-x64-musl.tar.gz",
+      "checksum": "13135A6A2106F9D111FA9B48C8801ED119AD43E7E1D00DE17D77A9C44899AADA",
       "algorithm": "sha256"
     },
     {
-      "id": "registries/github_content/github.com/aquaproj/aqua-registry/v4.552.0/registry.yaml",
-      "checksum": "24EE3C66CE9DD9C2A5F790268252399A3614A746F50DB24158096974B98C8618",
+      "id": "registries/github_content/github.com/aquaproj/aqua-registry/v4.558.0/registry.yaml",
+      "checksum": "C8B993BF6BF0214565B80178A3B19AC784FD9F49F1A13EA3DC417574BC0587BA",
       "algorithm": "sha256"
     }
   ]
