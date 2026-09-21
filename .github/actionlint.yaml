@@ -1,0 +1,12 @@
+self-hosted-runner:
+  labels: []
+
+config-variables: null
+
+paths:
+  .github/workflows/**/*.{yml,yaml}:
+    ignore:
+      # GitHub added self-repository action references in July 2026.
+      # actionlint v1.7.12 does not parse "$/..." yet.
+      - 'specifying action "\$/.+" in invalid format because ref is missing'
+      - 'reusable workflow call "\$/.+" at "uses" is not following the format'

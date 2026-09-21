@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
+        uses: $/.github/actions/setup-toolchain
         with:
           setup-aqua: "true"
 
@@ -37,6 +37,55 @@ jobs:
         run: |
           actionlint -version
           reviewdog -version
+
+      - name: Check actionlint self-repository support
+        shell: bash
+        run: |
+          probe=".github/workflows/actionlint-self-repository-probe.yml"
+          config="$(mktemp)"
+          cleanup() {
+            rm -f "$probe" "$config"
+          }
+          trap cleanup EXIT
+
+          cat > "$probe" <<'YAML'
+          name: actionlint self-repository probe
+          on:
+            workflow_dispatch:
+          permissions: {}
+          jobs:
+            probe:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: $/.github/actions/setup-toolchain
+            reusable:
+              uses: $/.github/workflows/add-version-to-pr-title.yml
+              with:
+                version: 0.0.0
+          YAML
+
+          printf 'self-hosted-runner:\n  labels: []\nconfig-variables: null\npaths: {}\n' > "$config"
+
+          set +e
+          output="$(actionlint -config-file "$config" "$probe" 2>&1)"
+          status=$?
+          set -e
+
+          if [ "$status" -eq 0 ]; then
+            echo "actionlint now supports GitHub self-repository syntax."
+            echo "Remove the temporary ignore from .github/actionlint.yaml."
+            exit 1
+          fi
+
+          if ! grep -q 'specifying action "\$/.github/actions/setup-toolchain" in invalid format because ref is missing' <<< "$output"; then
+            echo "$output"
+            exit 1
+          fi
+
+          if ! grep -q 'reusable workflow call "\$/.github/workflows/add-version-to-pr-title.yml" at "uses" is not following the format' <<< "$output"; then
+            echo "$output"
+            exit 1
+          fi
 
       - name: Run actionlint via reviewdog
         env:
@@ -76,7 +125,7 @@ jobs:
       # its release notes state Docker image use is "fully hash-checked internally".
       # See: https://github.com/zizmorcore/zizmor-action/releases/tag/v0.4.0
       - name: Run zizmor (no Advanced Security)
-        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        uses: zizmorcore/zizmor-action@70fb788f84895a7701f5643d103d587e460b5c99 # v0.6.3
         with:
           advanced-security: false
           annotations: true
@@ -98,7 +147,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
+        uses: $/.github/actions/setup-toolchain
         with:
           setup-aqua: "true"
 

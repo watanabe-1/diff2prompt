@@ -21,7 +21,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain (from aqua/aqua.yaml)
-        uses: ./.github/actions/setup-toolchain
+        uses: $/.github/actions/setup-toolchain
         with:
           bun-version: aqua
           bun-cache: "true"
@@ -53,7 +53,7 @@ jobs:
       # --- Restore Bun back to matrix for the rest ---
       - name: Restore Bun (from matrix)
         if: matrix.bun-version != 'aqua'
-        uses: ./.github/actions/setup-toolchain
+        uses: $/.github/actions/setup-toolchain
         with:
           bun-version: ${{ matrix.bun-version }}
 

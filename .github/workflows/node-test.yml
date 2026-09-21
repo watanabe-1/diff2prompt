@@ -22,7 +22,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
+        uses: $/.github/actions/setup-toolchain
         with:
           node-version: ${{ matrix.node-version }}
           bun-version: aqua
@@ -59,7 +59,7 @@ jobs:
 
       - name: Report Coverage
         if: ${{ matrix.node-version == 'aqua' }}
-        uses: davelosert/vitest-coverage-report-action@8b157684c6a6b259b97d45e72b44242865c0f6a5 # v2.12.2
+        uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2.13.0
         with:
           comment-on: ${{ github.event_name == 'pull_request' && 'pr' || 'commit' }}
 
