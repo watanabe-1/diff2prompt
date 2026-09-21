@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
+        uses: $/.github/actions/setup-toolchain
         with:
           node-version: aqua
           bun-version: aqua
@@ -85,7 +85,7 @@ jobs:
 
   tag_prs:
     needs: release
-    uses: ./.github/workflows/add-version-to-pr-title.yml
+    uses: $/.github/workflows/add-version-to-pr-title.yml
     with:
       version: ${{ needs.release.outputs.version }}
     permissions:

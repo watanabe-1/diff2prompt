@@ -22,7 +22,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
+        uses: $/.github/actions/setup-toolchain
         with:
           node-version: ${{ matrix.node-version }}
           bun-version: aqua

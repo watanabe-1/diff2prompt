@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
+        uses: $/.github/actions/setup-toolchain
         with:
           setup-aqua: "true"
 
@@ -37,6 +37,55 @@ jobs:
         run: |
           actionlint -version
           reviewdog -version
+
+      - name: Check actionlint self-repository support
+        shell: bash
+        run: |
+          probe=".github/workflows/actionlint-self-repository-probe.yml"
+          config="$(mktemp)"
+          cleanup() {
+            rm -f "$probe" "$config"
+          }
+          trap cleanup EXIT
+
+          cat > "$probe" <<'YAML'
+          name: actionlint self-repository probe
+          on:
+            workflow_dispatch:
+          permissions: {}
+          jobs:
+            probe:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: $/.github/actions/setup-toolchain
+            reusable:
+              uses: $/.github/workflows/add-version-to-pr-title.yml
+              with:
+                version: 0.0.0
+          YAML
+
+          printf 'self-hosted-runner:\n  labels: []\nconfig-variables: null\npaths: {}\n' > "$config"
+
+          set +e
+          output="$(actionlint -config-file "$config" "$probe" 2>&1)"
+          status=$?
+          set -e
+
+          if [ "$status" -eq 0 ]; then
+            echo "actionlint now supports GitHub self-repository syntax."
+            echo "Remove the temporary ignore from .github/actionlint.yaml."
+            exit 1
+          fi
+
+          if ! grep -q 'specifying action "\$/.github/actions/setup-toolchain" in invalid format because ref is missing' <<< "$output"; then
+            echo "$output"
+            exit 1
+          fi
+
+          if ! grep -q 'reusable workflow call "\$/.github/workflows/add-version-to-pr-title.yml" at "uses" is not following the format' <<< "$output"; then
+            echo "$output"
+            exit 1
+          fi
 
       - name: Run actionlint via reviewdog
         env:
@@ -98,7 +147,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
+        uses: $/.github/actions/setup-toolchain
         with:
           setup-aqua: "true"
 
