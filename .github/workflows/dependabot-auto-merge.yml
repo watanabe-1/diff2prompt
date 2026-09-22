@@ -1,7 +1,9 @@
 name: Dependabot auto merge
 
 on:
-  pull_request_target: # zizmor: ignore[dangerous-triggers] Dependabot metadata only; this workflow never checks out or executes PR code.
+  # pull_request_target is required so the workflow can approve and enable auto-merge for trusted Dependabot PRs.
+  # The called workflow gates on Dependabot bot identity, same repository head/base, default branch, and non-draft state.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
     types:
       - opened
       - reopened
@@ -13,115 +15,10 @@ permissions: {}
 jobs:
   auto-merge:
     name: Auto approve and enable auto-merge
-    if: >-
-      github.event.pull_request.user.login == 'dependabot[bot]' &&
-      github.event.pull_request.user.type == 'Bot' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.base.repo.full_name == github.repository &&
-      github.event.pull_request.base.ref == github.event.repository.default_branch &&
-      ! github.event.pull_request.draft
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
+    uses: watanabe-1/github-actions-common/.github/workflows/dependabot-auto-merge.yml@c24a1f966b3d2d20ca30379e5a27ed137bfe760f # v1.0.2
     permissions:
       contents: write # required to enable GitHub auto-merge
       pull-requests: write # required to read Dependabot metadata and submit approval review
-    steps:
-      - name: Fetch Dependabot metadata
-        id: dependabot-metadata
-        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
-
-      - name: Auto approve and enable auto-merge
-        if: >-
-          steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' ||
-          steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          UPDATE_TYPE: ${{ steps.dependabot-metadata.outputs.update-type }}
-        with:
-          script: |
-            const pr = context.payload.pull_request;
-            const updateType = process.env.UPDATE_TYPE;
-
-            core.info(`Dependabot update type: ${updateType}`);
-
-            await github.rest.pulls.createReview({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.number,
-              event: "APPROVE",
-            });
-
-            const query = `
-              query($owner: String!, $repo: String!, $number: Int!) {
-                repository(owner: $owner, name: $repo) {
-                  mergeCommitAllowed
-                  squashMergeAllowed
-                  rebaseMergeAllowed
-                  pullRequest(number: $number) {
-                    id
-                    autoMergeRequest {
-                      enabledAt
-                      mergeMethod
-                    }
-                  }
-                }
-              }
-            `;
-
-            const result = await github.graphql(query, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              number: pr.number,
-            });
-
-            const pullRequest = result.repository.pullRequest;
-            if (pullRequest.autoMergeRequest) {
-              core.info(
-                `Auto-merge is already enabled with ${pullRequest.autoMergeRequest.mergeMethod}.`,
-              );
-              return;
-            }
-
-            const mergeMethod =
-              result.repository.mergeCommitAllowed ? "MERGE" :
-              result.repository.squashMergeAllowed ? "SQUASH" :
-              result.repository.rebaseMergeAllowed ? "REBASE" :
-              null;
-
-            if (!mergeMethod) {
-              core.setFailed("No pull request merge method is enabled for this repository.");
-              return;
-            }
-
-            const mutation = `
-              mutation(
-                $pullRequestId: ID!,
-                $mergeMethod: PullRequestMergeMethod!,
-                $expectedHeadOid: GitObjectID!
-              ) {
-                enablePullRequestAutoMerge(input: {
-                  pullRequestId: $pullRequestId,
-                  mergeMethod: $mergeMethod,
-                  expectedHeadOid: $expectedHeadOid
-                }) {
-                  pullRequest {
-                    number
-                    autoMergeRequest {
-                      enabledAt
-                      mergeMethod
-                    }
-                  }
-                }
-              }
-            `;
-
-            await github.graphql(mutation, {
-              pullRequestId: pullRequest.id,
-              mergeMethod,
-              expectedHeadOid: pr.head.sha,
-            });
-
-            core.info(`Enabled auto-merge with ${mergeMethod}.`);
+    with:
+      automerge-patch: true
+      automerge-minor: true
