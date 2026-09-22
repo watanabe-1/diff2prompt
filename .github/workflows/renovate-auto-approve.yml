@@ -1,0 +1,43 @@
+name: Renovate auto approve
+
+on:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] Renovate label metadata only; this workflow never checks out or executes PR code.
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - labeled
+
+permissions: {}
+
+jobs:
+  approve:
+    name: Auto approve Renovate PR
+    if: >-
+      github.event.pull_request.user.login == 'watanabe-1-renovate-bot[bot]' &&
+      github.event.pull_request.user.type == 'Bot' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.repo.full_name == github.repository &&
+      github.event.pull_request.base.ref == github.event.repository.default_branch &&
+      startsWith(github.event.pull_request.head.ref, 'renovate/') &&
+      contains(github.event.pull_request.labels.*.name, 'renovate-automerge') &&
+      ! github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      pull-requests: write # required to submit PR approval review
+    steps:
+      - name: Auto approve
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              event: "APPROVE",
+            });
