@@ -2,5 +2,21 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "enabledManagers": ["custom.regex"],
   "extends": ["github>aquaproj/aqua-renovate-config#2.13.0", "group:allNonMajor"],
+  "minimumReleaseAge": "7 days",
+  "packageRules": [
+    {
+      "description": "Automerge patch and minor updates after required checks pass.",
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true,
+      "automergeType": "pr",
+      "labels": ["renovate-automerge"]
+    },
+    {
+      "description": "Require human review for major updates.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ],
+  "platformAutomerge": true,
   "prHourlyLimit": 5
 }
