@@ -18,5 +18,4 @@ jobs:
       pull-requests: write
       actions: read
     with:
-      actionlint-self-action-path: "$/.github/actions/setup-toolchain"
       actionlint-self-reusable-workflow-path: "$/.github/workflows/add-version-to-pr-title.yml"
