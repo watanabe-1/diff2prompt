@@ -1,7 +1,9 @@
 name: Renovate auto approve
 
 on:
-  pull_request_target: # zizmor: ignore[dangerous-triggers] Renovate label metadata only; this workflow never checks out or executes PR code.
+  # pull_request_target is required so the workflow can approve trusted Renovate PRs.
+  # The called workflow gates on bot login/type, same repository head/base, default branch, branch prefix, label, and non-draft state.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
     types:
       - opened
       - reopened
@@ -14,30 +16,10 @@ permissions: {}
 jobs:
   approve:
     name: Auto approve Renovate PR
-    if: >-
-      github.event.pull_request.user.login == 'watanabe-1-renovate-bot[bot]' &&
-      github.event.pull_request.user.type == 'Bot' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.base.repo.full_name == github.repository &&
-      github.event.pull_request.base.ref == github.event.repository.default_branch &&
-      startsWith(github.event.pull_request.head.ref, 'renovate/') &&
-      contains(github.event.pull_request.labels.*.name, 'renovate-automerge') &&
-      ! github.event.pull_request.draft
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
+    uses: watanabe-1/github-actions-common/.github/workflows/renovate-auto-approve.yml@c24a1f966b3d2d20ca30379e5a27ed137bfe760f # v1.0.2
     permissions:
       pull-requests: write # required to submit PR approval review
-    steps:
-      - name: Auto approve
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            await github.rest.pulls.createReview({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-              event: "APPROVE",
-            });
+    with:
+      renovate-bot-login: watanabe-1-renovate-bot[bot]
+      automerge-label: renovate-automerge
+      head-ref-prefix: renovate/

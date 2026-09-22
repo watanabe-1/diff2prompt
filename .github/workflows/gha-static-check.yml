@@ -8,14 +8,10 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   gha-static-check:
     name: GHA static checks status check
-    uses: watanabe-1/github-actions-common/.github/workflows/gha-static-check.yml@2e68dafee94b4c5c567ecf580afe89ae6a36e660 # v1.0.1
+    uses: watanabe-1/github-actions-common/.github/workflows/gha-static-check.yml@c24a1f966b3d2d20ca30379e5a27ed137bfe760f # v1.0.2
     permissions:
       contents: read
       checks: write

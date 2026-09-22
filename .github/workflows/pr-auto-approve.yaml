@@ -12,21 +12,6 @@ permissions: {}
 jobs:
   approve:
     name: Auto approve owner PR
-    if: github.event.pull_request.user.login == github.repository_owner && ! github.event.pull_request.draft
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
+    uses: watanabe-1/github-actions-common/.github/workflows/pr-auto-approve.yml@c24a1f966b3d2d20ca30379e5a27ed137bfe760f # v1.0.2
     permissions:
       pull-requests: write # required to submit PR approval review
-    steps:
-      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            await github.rest.pulls.createReview({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-              event: "APPROVE",
-            });

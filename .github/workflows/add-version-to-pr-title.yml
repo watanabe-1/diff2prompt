@@ -11,6 +11,8 @@ on:
       github-token:
         required: true
 
+permissions: {}
+
 jobs:
   tag_prs:
     runs-on: ubuntu-latest
