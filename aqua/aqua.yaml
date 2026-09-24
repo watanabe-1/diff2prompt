@@ -12,10 +12,10 @@ checksum:
     - all
 registries:
   - type: standard
-    ref: v4.563.0 # renovate: depName=aquaproj/aqua-registry
+    ref: v4.564.0 # renovate: depName=aquaproj/aqua-registry
 
 packages:
-  - name: nodejs/node@v26.8.2
+  - name: nodejs/node@v26.9.0
   - name: oven-sh/bun@bun-v1.4.2
   - name: rhysd/actionlint@v1.7.12
   - name: reviewdog/reviewdog@v0.21.1
