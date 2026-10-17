@@ -16,7 +16,7 @@ registries:
 
 packages:
   - name: nodejs/node@v26.11.1
-  - name: oven-sh/bun@bun-v1.4.2
+  - name: oven-sh/bun@bun-v1.4.3
   - name: rhysd/actionlint@v1.7.12
   - name: reviewdog/reviewdog@v0.21.2
   - name: suzuki-shunsuke/ghalint@v1.5.6
