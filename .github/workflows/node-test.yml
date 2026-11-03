@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain
-        uses: watanabe-1/github-actions-common/actions/setup-toolchain@c24a1f966b3d2d20ca30379e5a27ed137bfe760f # v1.0.2
+        uses: watanabe-1/github-actions-common/actions/setup-toolchain@25793bf94b62c4948ce9742c8da78de3865822c9 # v1.1.0
         with:
           node-version: ${{ matrix.node-version }}
           bun-version: aqua
@@ -61,7 +61,7 @@ jobs:
 
       - name: Report Coverage
         if: ${{ matrix.node-version == 'aqua' }}
-        uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2.13.0
+        uses: davelosert/vitest-coverage-report-action@8f86cfb56ed6d5613ea8cdc5259f207fbfd51ece # v2.13.1
         with:
           comment-on: ${{ github.event_name == 'pull_request' && 'pr' || 'commit' }}
 
