@@ -19,6 +19,6 @@ packages:
   - name: oven-sh/bun@bun-v1.4.4
   - name: rhysd/actionlint@v1.7.12
   - name: reviewdog/reviewdog@v0.21.2
-  - name: suzuki-shunsuke/ghalint@v1.5.7
+  - name: suzuki-shunsuke/ghalint@v1.6.0
   - name: zizmorcore/zizmor@v1.31.1
   - name: suzuki-shunsuke/pinact@v5.0.2
