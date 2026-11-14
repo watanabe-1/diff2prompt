@@ -220,6 +220,13 @@ CI verifies the lockfile, and the shared autofix workflow regenerates it through
 it updates action versions. Local security checks require lockfile-aware versions
 of zizmor and ghalint, managed in `aqua/aqua.yaml`.
 
+Renovate tracks release-tag pins in `gh extension install ... --pin ...` commands
+in workflows and this README through a custom regex manager. It updates these
+occurrences together using GitHub Releases. The inherited seven-day release-age
+requirement and patch/minor auto-merge policy apply; major updates require review.
+The extension version used by the shared autofix workflow is managed in
+`watanabe-1/github-actions-common`.
+
 1. Fork and create a feature branch.
 
 2. Add tests for new behaviors.
