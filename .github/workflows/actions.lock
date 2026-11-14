@@ -14,7 +14,7 @@ workflows:
         - 'watanabe-1/github-actions-common@v1.2.1'
     '.github/workflows/create-release-pr.yml':
         - 'actions/checkout@v7.0.1'
-        - 'peter-evans/create-pull-request@v8.1.1'
+        - 'peter-evans/create-pull-request@v8.1.2'
         - 'watanabe-1/github-actions-common@v1.2.1'
     '.github/workflows/dependabot-auto-merge.yml': []
     '.github/workflows/gha-static-check.yml': []
@@ -68,9 +68,9 @@ dependencies:
         commit: 'sha1-0c5077e51419868618aeaa5fe8019c62421857d6'
         owner_id: 108928776
         repo_id: 512644635
-    'peter-evans/create-pull-request@v8.1.1':
-        ref: 'v8.1.1'
-        commit: 'sha1-5f6978faf089d4d20b00c7766989d076bb2fc7f1'
+    'peter-evans/create-pull-request@v8.1.2':
+        ref: 'v8.1.2'
+        commit: 'sha1-15733dbdfeedb4f7fdb73d13c6f5ac83b710fab8'
         owner_id: 18365890
         repo_id: 197176365
     'renovatebot/github-action@v46.3.12':
