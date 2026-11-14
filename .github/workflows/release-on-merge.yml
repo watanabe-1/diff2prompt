@@ -24,13 +24,13 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Setup toolchain
-        uses: watanabe-1/github-actions-common/actions/setup-toolchain@25793bf94b62c4948ce9742c8da78de3865822c9 # v1.1.0
+        uses: watanabe-1/github-actions-common/actions/setup-toolchain@v1.2.1
         with:
           node-version: aqua
           bun-version: aqua
