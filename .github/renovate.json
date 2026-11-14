@@ -1,5 +1,17 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>watanabe-1/github-actions-common//renovate/default.json#v1"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update GitHub CLI extensions pinned to release tags.",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/", "/^README\\.md$/"],
+      "matchStrings": [
+        "gh extension install (?<depName>[\\w.-]+/gh-[\\w.-]+) --pin (?<currentValue>v?\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    }
+  ],
   "rebaseWhen": "behind-base-branch"
 }
