@@ -19,12 +19,12 @@ jobs:
         node-version: [22, 24, aqua]
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup toolchain
-        uses: watanabe-1/github-actions-common/actions/setup-toolchain@25793bf94b62c4948ce9742c8da78de3865822c9 # v1.1.0
+        uses: watanabe-1/github-actions-common/actions/setup-toolchain@v1.2.1
         with:
           node-version: ${{ matrix.node-version }}
           bun-version: aqua
@@ -61,7 +61,7 @@ jobs:
 
       - name: Report Coverage
         if: ${{ matrix.node-version == 'aqua' }}
-        uses: davelosert/vitest-coverage-report-action@74c2d9210b4fc44c84d8213f61d7ec99837b7aa0 # v2.13.2
+        uses: davelosert/vitest-coverage-report-action@v2.13.2
         with:
           comment-on: ${{ github.event_name == 'pull_request' && 'pr' || 'commit' }}
 
