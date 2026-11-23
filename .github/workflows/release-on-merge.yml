@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain
-        uses: watanabe-1/github-actions-common/actions/setup-toolchain@v1.2.1
+        uses: watanabe-1/github-actions-common/actions/setup-toolchain@v1.2.5
         with:
           node-version: aqua
           bun-version: aqua
