@@ -16,7 +16,7 @@ permissions: {}
 jobs:
   approve:
     name: Auto approve Renovate PR
-    uses: watanabe-1/github-actions-common/.github/workflows/renovate-auto-approve.yml@202f337fb19a680cf6ec2180192ec43460a4bd18 # v1.2.1
+    uses: watanabe-1/github-actions-common/.github/workflows/renovate-auto-approve.yml@0e9b6763a2f343233b82faed14089cf328d8f4b3 # v1.2.5
     permissions:
       pull-requests: write # required to submit PR approval review
     with:
