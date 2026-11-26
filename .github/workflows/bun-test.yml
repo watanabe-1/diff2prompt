@@ -23,7 +23,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain (from aqua/aqua.yaml)
-        uses: watanabe-1/github-actions-common/actions/setup-toolchain@v1.2.5
+        uses: watanabe-1/github-actions-common/actions/setup-toolchain@v1.2.6
         with:
           bun-version: aqua
           bun-cache: "true"
@@ -55,7 +55,7 @@ jobs:
       # --- Restore Bun back to matrix for the rest ---
       - name: Restore Bun (from matrix)
         if: matrix.bun-version != 'aqua'
-        uses: watanabe-1/github-actions-common/actions/setup-toolchain@v1.2.5
+        uses: watanabe-1/github-actions-common/actions/setup-toolchain@v1.2.6
         with:
           bun-version: ${{ matrix.bun-version }}
 
