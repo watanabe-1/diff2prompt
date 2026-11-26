@@ -11,7 +11,7 @@ permissions: {}
 jobs:
   gha-static-check:
     name: GHA static checks status check
-    uses: watanabe-1/github-actions-common/.github/workflows/gha-static-check.yml@0e9b6763a2f343233b82faed14089cf328d8f4b3 # v1.2.5
+    uses: watanabe-1/github-actions-common/.github/workflows/gha-static-check.yml@15224360f072051b948762dee6dc85bad60a17f2 # v1.2.6
     permissions:
       contents: read
       checks: write
